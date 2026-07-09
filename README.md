@@ -1,8 +1,11 @@
 # spark-redis-connector
 
-`spark-redis-connector` is a Spark SQL connector for Redis built around Spark DataSource V2.
+<p align="center">
+  <strong>Language / 语言</strong><br/>
+  English · <a href="README.zh-CN.md"><strong>📖 中文文档</strong></a>
+</p>
 
-[中文文档](README.zh-CN.md)
+`spark-redis-connector` is a Spark SQL connector for Redis built around Spark DataSource V2.
 
 The project intentionally focuses on Spark SQL and DataFrame APIs only. It does not carry the legacy RDD, DStream, Spark Streaming, or DataSource V1 APIs from older Spark Redis connectors.
 
