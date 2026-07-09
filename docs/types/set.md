@@ -61,10 +61,13 @@ tags.write
   .save()
 ```
 
-## Options
+## Type-Specific Options
+
+This section lists options most relevant to this Redis type. See the README Core Options section for the full option list.
 
 | Option | Description |
 | --- | --- |
+| `key.prefix` | Prefix stripped from returned Spark keys during reads and prepended to Redis keys during writes. |
 | `value.column` | Column used as the set member. Default: `value`. |
 | `ttl` | Expiration in seconds for written keys. Default: `0`, meaning no expiration. |
 
