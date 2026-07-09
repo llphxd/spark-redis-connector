@@ -2,6 +2,8 @@
 
 `spark-redis-connector` is a Spark SQL connector for Redis built around Spark DataSource V2.
 
+[中文文档](README.zh-CN.md)
+
 The project intentionally focuses on Spark SQL and DataFrame APIs only. It does not carry the legacy RDD, DStream, Spark Streaming, or DataSource V1 APIs from older Spark Redis connectors.
 
 ## Features
@@ -57,7 +59,8 @@ OPTIONS (
   type='hash',
   host='localhost',
   port='6379',
-  keys.pattern='user:*'
+  keys.pattern='user:*',
+  key.prefix='user:'
 );
 
 SELECT * FROM redis_users;
@@ -77,6 +80,7 @@ val users = spark.read
   .option("host", "localhost")
   .option("port", "6379")
   .option("keys.pattern", "user:*")
+  .option("key.prefix", "user:")
   .schema("key STRING, name STRING, age INT")
   .load()
 
@@ -96,7 +100,8 @@ CREATE OR REPLACE TEMPORARY VIEW redis_users (
 USING redis
 OPTIONS (
   type='hash',
-  keys.pattern='user:*'
+  keys.pattern='user:*',
+  key.prefix='user:'
 );
 
 SELECT key, name, age FROM redis_users;
@@ -109,6 +114,7 @@ val users = spark.read
   .format("redis")
   .option("type", "hash")
   .option("keys.pattern", "user:*")
+  .option("key.prefix", "user:")
   .schema("key STRING, name STRING, age INT")
   .load()
 ```
@@ -163,7 +169,7 @@ Spark can infer a default schema for each Redis data type when you do not declar
 | `keys.pattern` | Read, Overwrite | Conditional | Redis key pattern used for `SCAN` during reads and truncate-style overwrite. Example: `keys.pattern='user:*'` | unset |
 | `keys` | Read, Overwrite | Conditional | Comma-separated explicit keys used for reads and truncate-style overwrite. Example: `keys='user:1,user:2'` | unset |
 | `key.column` | Read, Write | No | Spark column that contains or receives the Redis key. Example: `key.column='id'` writes row `id=1001` as Redis key `1001` unless `key.prefix` is set | `key` |
-| `key.prefix` | Write | No | Prefix prepended to written Redis keys. Example: `key.prefix='user:'` and `id=1001` writes key `user:1001` | empty |
+| `key.prefix` | Read, Write | No | Prefix stripped from returned Spark keys during reads and prepended to Redis keys during writes. Example: reading Redis key `user:1001` returns Spark key `1001`; writing Spark key `1001` writes Redis key `user:1001` | empty |
 | `value.column` | Read, Write | No | Value column for string, set, list, and hash field/value mode. Example: `value.column='payload'` | `value` |
 | `field.column` | Read, Write | No | Hash field column in field/value mode. Example: `field.column='field_name'` | `field` |
 | `member.column` | Read, Write | No | Sorted set member column. Example: `member.column='item'` | `member` |

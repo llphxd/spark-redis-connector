@@ -49,7 +49,7 @@ class RedisDataWriter(schema: StructType, options: RedisOptions) extends DataWri
 
   override def write(record: InternalRow): Unit = {
     val logicalKey = RedisRowCodec.stringAt(record, schema, options.keyColumn)
-    val key = options.keyPrefix + logicalKey
+    val key = RedisKeyCodec.toRedisKey(logicalKey, options)
 
     options.dataType match {
       case RedisDataType.StringValue =>
