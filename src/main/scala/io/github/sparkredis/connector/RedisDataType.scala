@@ -1,4 +1,4 @@
-package io.github.sparkredis.catalyst
+package io.github.sparkredis.connector
 
 sealed trait RedisDataType extends Product with Serializable {
   def name: String

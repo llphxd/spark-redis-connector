@@ -1,1 +1,1 @@
-io.github.sparkredis.catalyst.RedisDataSource
+io.github.sparkredis.connector.RedisDataSource
