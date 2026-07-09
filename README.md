@@ -71,35 +71,9 @@ val users = spark.read
 users.show()
 ```
 
-## SQL Examples
+## Examples
 
-Read Redis strings:
-
-```sql
-CREATE OR REPLACE TEMPORARY VIEW redis_config
-USING redis
-OPTIONS (
-  type='string',
-  keys.pattern='config:*'
-);
-
-SELECT key, value FROM redis_config;
-```
-
-Read Redis hashes as one row per hash field:
-
-```sql
-CREATE OR REPLACE TEMPORARY VIEW redis_hash_fields
-USING redis
-OPTIONS (
-  type='hash',
-  keys.pattern='user:*'
-);
-
-SELECT key, field, value FROM redis_hash_fields;
-```
-
-Read Redis hashes with a custom schema:
+Read Redis hashes with Spark SQL:
 
 ```sql
 CREATE OR REPLACE TEMPORARY VIEW redis_users (
@@ -110,66 +84,13 @@ CREATE OR REPLACE TEMPORARY VIEW redis_users (
 USING redis
 OPTIONS (
   type='hash',
-  keys.pattern='user:*',
-  key.column='key'
+  keys.pattern='user:*'
 );
 
 SELECT key, name, age FROM redis_users;
 ```
 
-Write Redis hashes:
-
-```sql
-CREATE OR REPLACE TEMPORARY VIEW redis_user_out (
-  id STRING,
-  name STRING,
-  age INT
-)
-USING redis
-OPTIONS (
-  type='hash',
-  key.column='id',
-  key.prefix='user:',
-  ttl='3600'
-);
-
-INSERT INTO redis_user_out
-SELECT id, name, age FROM source_users;
-```
-
-Hash writes support two layouts:
-
-- Field/value layout: schema contains `key`, `field`, and `value`; each row is written as `HSET key field value`.
-- Flattened layout: schema contains `key` plus arbitrary columns; each non-key column name becomes a Redis hash field.
-
-Read sorted sets:
-
-```sql
-CREATE OR REPLACE TEMPORARY VIEW redis_scores
-USING redis
-OPTIONS (
-  type='zset',
-  keys.pattern='ranking:*'
-);
-
-SELECT key, member, score FROM redis_scores;
-```
-
-Read Redis lists as arrays:
-
-```sql
-CREATE OR REPLACE TEMPORARY VIEW redis_lists
-USING redis
-OPTIONS (
-  type='list',
-  keys.pattern='list:*',
-  list.read.mode='array'
-);
-
-SELECT key, values FROM redis_lists;
-```
-
-## DataFrame Examples
+Read the same data with the DataFrame API:
 
 ```scala
 val users = spark.read
@@ -180,6 +101,8 @@ val users = spark.read
   .load()
 ```
 
+Write Redis hashes:
+
 ```scala
 users.write
   .format("redis")
@@ -189,40 +112,23 @@ users.write
   .save()
 ```
 
-Overwrite is supported as truncate-style overwrite when `keys` or `keys.pattern` identifies the target keyspace:
+Overwrite is supported as truncate-style overwrite when `keys` or `keys.pattern` identifies the target keyspace.
 
-```scala
-users.write
-  .format("redis")
-  .option("type", "hash")
-  .option("key.column", "key")
-  .option("keys.pattern", "user:*")
-  .mode("overwrite")
-  .save()
-```
+## Type Documentation
+
+The connector supports batch reads and writes for the five core Redis data types. See the detailed type guides for schemas, SQL examples, DataFrame examples, and type-specific options.
+
+| Redis type | Default read schema | Write command | Guide |
+| --- | --- | --- | --- |
+| `string` | `key STRING`, `value STRING` | `SET` / `SETEX` | [String](docs/types/string.md) |
+| `hash` | `key STRING`, `field STRING`, `value STRING` | `HSET` | [Hash](docs/types/hash.md) |
+| `list` | `key STRING`, `index LONG`, `value STRING` | `RPUSH` / `LPUSH` | [List](docs/types/list.md) |
+| `set` | `key STRING`, `value STRING` | `SADD` | [Set](docs/types/set.md) |
+| `zset` | `key STRING`, `member STRING`, `score DOUBLE` | `ZADD` | [Sorted Set](docs/types/zset.md) |
 
 ## Schema Usage
 
-Spark can infer a default schema for each Redis data type when you do not declare one in SQL or DataFrame code. Use the default schema when you want to inspect Redis data in its natural connector layout.
-
-For `string`, `set`, and `zset`, the default schemas are usually enough because these types have a fixed row shape:
-
-- `string`: `key STRING, value STRING`
-- `set`: `key STRING, value STRING`
-- `zset`: `key STRING, member STRING, score DOUBLE`
-
-For `list`, the default read schema depends on `list.read.mode`:
-
-- `explode`: `key STRING, index LONG, value STRING`, one Spark row per Redis list element.
-- `array`: `key STRING, values ARRAY<STRING>`, one Spark row per Redis list key.
-
-For `hash`, schema choice changes the table shape:
-
-- Without a custom schema, hashes are read as `key STRING, field STRING, value STRING`. This is best for discovering unknown or inconsistent hash fields.
-- With a custom schema such as `key STRING, name STRING, age INT`, each Redis hash key becomes one Spark row, and each non-key column name is read from the matching Redis hash field with `HMGET`.
-- For writes, a schema containing `field` and `value` uses field/value layout (`HSET key field value`). A schema without `field` uses flattened layout, where every non-key column is written as a Redis hash field.
-
-Use a custom schema when you want Spark types other than `STRING`, when you want a wide table for Redis hashes, or when your write path needs explicit column names such as `key`, `field`, `value`, `member`, or `score`.
+Spark can infer a default schema for each Redis data type when you do not declare one in SQL or DataFrame code. Use a custom schema when you want Spark types other than `STRING`, when you want a wide table for Redis hashes, or when your write path needs explicit column names such as `key`, `field`, `value`, `member`, or `score`.
 
 ## Core Options
 
@@ -258,21 +164,6 @@ Use a custom schema when you want Spark types other than `STRING`, when you want
 | `ttl` | Write | No | Expiration in seconds for written keys. `0` means no expiration. Example: `ttl='3600'` | `0` |
 
 For reads, either `keys.pattern` or `keys` is required. For overwrite writes, `keys.pattern` or `keys` is required to identify the keyspace to delete before writing new rows.
-
-## Type Layouts
-
-| Redis type | Default columns | Write command |
-| --- | --- | --- |
-| `string` | `key STRING`, `value STRING` | `SET key value` |
-| `list` read explode | `key STRING`, `index LONG`, `value STRING` | - |
-| `list` read array | `key STRING`, `values ARRAY<STRING>` | - |
-| `list` write | `key STRING`, `value STRING` | `RPUSH key value` by default, or `LPUSH key value` with `list.write.command='lpush'` |
-| `set` | `key STRING`, `value STRING` | `SADD key value` |
-| `hash` | `key STRING`, `field STRING`, `value STRING` | `HSET key field value` |
-| `hash` flattened | `key STRING`, plus user columns | `HSET key col1 value1 ...` |
-| `zset` | `key STRING`, `member STRING`, `score DOUBLE` | `ZADD key score member` |
-
-The common Redis value columns are represented as Spark `STRING`. Sorted set score is represented as Spark `DOUBLE`.
 
 ## Build
 
