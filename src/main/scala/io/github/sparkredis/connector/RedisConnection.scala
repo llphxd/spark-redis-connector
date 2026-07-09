@@ -1,19 +1,98 @@
 package io.github.sparkredis.connector
 
-import redis.clients.jedis.Jedis
+import java.io.FileInputStream
+import java.security.KeyStore
+import javax.net.ssl.{SSLContext, SSLSocketFactory, TrustManagerFactory}
+
+import org.apache.commons.pool2.impl.GenericObjectPoolConfig
+import redis.clients.jedis.{DefaultJedisClientConfig, HostAndPort, Jedis, JedisPool}
+
+import scala.collection.concurrent.TrieMap
 
 object RedisConnection {
+  private val pools = TrieMap.empty[RedisPoolKey, JedisPool]
+
   def open(options: RedisOptions): Jedis = {
-    val jedis = new Jedis(options.host, options.port, options.timeoutMillis)
-    options.password.foreach { password =>
-      options.user match {
-        case Some(user) => jedis.auth(user, password)
-        case None => jedis.auth(password)
+    pools.getOrElseUpdate(RedisPoolKey.from(options), createPool(options)).getResource
+  }
+
+  private def createPool(options: RedisOptions): JedisPool = {
+    val poolConfig = new GenericObjectPoolConfig[Jedis]()
+    poolConfig.setMaxTotal(options.poolMaxTotal)
+    poolConfig.setMaxIdle(options.poolMaxIdle)
+    poolConfig.setMinIdle(options.poolMinIdle)
+
+    val clientConfigBuilder = DefaultJedisClientConfig.builder()
+      .connectionTimeoutMillis(options.connectTimeoutMillis)
+      .socketTimeoutMillis(options.socketTimeoutMillis)
+      .database(options.database)
+      .ssl(options.sslEnabled)
+
+    options.user.foreach(clientConfigBuilder.user)
+    options.password.foreach(clientConfigBuilder.password)
+    sslSocketFactory(options).foreach(clientConfigBuilder.sslSocketFactory)
+
+    new JedisPool(poolConfig, new HostAndPort(options.host, options.port), clientConfigBuilder.build())
+  }
+
+  private def sslSocketFactory(options: RedisOptions): Option[SSLSocketFactory] = {
+    if (!options.sslEnabled) {
+      None
+    } else {
+      options.sslTruststorePath.map { path =>
+        val keyStore = KeyStore.getInstance(options.sslTruststoreType)
+        val password = options.sslTruststorePassword.map(_.toCharArray).orNull
+        val stream = new FileInputStream(path)
+        try {
+          keyStore.load(stream, password)
+        } finally {
+          stream.close()
+        }
+
+        val trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm)
+        trustManagerFactory.init(keyStore)
+
+        val context = SSLContext.getInstance("TLS")
+        context.init(null, trustManagerFactory.getTrustManagers, null)
+        context.getSocketFactory
       }
     }
-    if (options.database != 0) {
-      jedis.select(options.database)
-    }
-    jedis
+  }
+}
+
+private final case class RedisPoolKey(
+    host: String,
+    port: Int,
+    user: Option[String],
+    password: Option[String],
+    database: Int,
+    connectTimeoutMillis: Int,
+    socketTimeoutMillis: Int,
+    poolMaxTotal: Int,
+    poolMaxIdle: Int,
+    poolMinIdle: Int,
+    sslEnabled: Boolean,
+    sslTruststorePath: Option[String],
+    sslTruststorePassword: Option[String],
+    sslTruststoreType: String)
+
+private object RedisPoolKey {
+  def from(options: RedisOptions): RedisPoolKey = {
+    RedisPoolKey(
+      host = options.host,
+      port = options.port,
+      user = options.user,
+      password = options.password,
+      database = options.database,
+      connectTimeoutMillis = options.connectTimeoutMillis,
+      socketTimeoutMillis = options.socketTimeoutMillis,
+      poolMaxTotal = options.poolMaxTotal,
+      poolMaxIdle = options.poolMaxIdle,
+      poolMinIdle = options.poolMinIdle,
+      sslEnabled = options.sslEnabled,
+      sslTruststorePath = options.sslTruststorePath,
+      sslTruststorePassword = options.sslTruststorePassword,
+      sslTruststoreType = options.sslTruststoreType
+    )
   }
 }
