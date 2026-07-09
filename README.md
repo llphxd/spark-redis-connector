@@ -14,6 +14,18 @@ The project intentionally focuses on Spark SQL and DataFrame APIs only. It does 
 
 Redis Streams are intentionally left for a separate design because batch stream reads and structured streaming have different offset and commit semantics.
 
+## Compatibility
+
+| Component | Supported version |
+| --- | --- |
+| Spark | `3.3.x`, `3.4.x`, `3.5.x` |
+| Scala binary version | `2.12` |
+| Java | `8+` |
+| Redis client | Jedis `5.1.5` |
+| Artifact | `spark-redis-connector_2.12` |
+
+Spark `3.2.x` and earlier, and Spark `4.x` and later, are not declared as supported by this release. They may work, but you should validate them with your own Spark and Redis runtime tests.
+
 ## Quick Start
 
 Download the latest release jar from GitHub Releases:
