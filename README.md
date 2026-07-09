@@ -36,8 +36,8 @@ Spark `3.2.x` and earlier, and Spark `4.x` and later, are not declared as suppor
 Download the latest release jar from GitHub Releases:
 
 ```bash
-curl -L -o spark-redis-connector_2.12-0.1.1-all.jar \
-  https://github.com/llphxd/spark-redis-connector/releases/download/v0.1.1/spark-redis-connector_2.12-0.1.1-all.jar
+curl -L -o spark-redis-connector_2.12-0.1.2-all.jar \
+  https://github.com/llphxd/spark-redis-connector/releases/download/v0.1.2/spark-redis-connector_2.12-0.1.2-all.jar
 ```
 
 Use the `all` jar when you want a single jar that already includes Jedis and other runtime dependencies.
@@ -46,7 +46,7 @@ Use the `all` jar when you want a single jar that already includes Jedis and oth
 
 ```bash
 spark-sql \
-  --jars spark-redis-connector_2.12-0.1.1-all.jar
+  --jars spark-redis-connector_2.12-0.1.2-all.jar
 ```
 
 Then run:
@@ -73,7 +73,7 @@ SELECT * FROM redis_users;
 
 ```bash
 spark-shell \
-  --jars spark-redis-connector_2.12-0.1.1-all.jar
+  --jars spark-redis-connector_2.12-0.1.2-all.jar
 ```
 
 ```scala
@@ -202,14 +202,14 @@ mvn package
 
 This creates two jars:
 
-- `target/spark-redis-connector_2.12-0.1.1.jar`: connector classes only.
-- `target/spark-redis-connector_2.12-0.1.1-all.jar`: connector plus runtime dependencies such as Jedis.
+- `target/spark-redis-connector_2.12-0.1.2.jar`: connector classes only.
+- `target/spark-redis-connector_2.12-0.1.2-all.jar`: connector plus runtime dependencies such as Jedis.
 
 For local Spark SQL testing, use the `all` jar:
 
 ```bash
 spark-shell \
-  --jars target/spark-redis-connector_2.12-0.1.1-all.jar
+  --jars target/spark-redis-connector_2.12-0.1.2-all.jar
 ```
 
 ## Design Notes
