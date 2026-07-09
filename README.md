@@ -4,38 +4,83 @@
 
 The project intentionally focuses on Spark SQL and DataFrame APIs only. It does not carry the legacy RDD, DStream, Spark Streaming, or DataSource V1 APIs from older Spark Redis connectors.
 
-## Goals
+## Features
 
-- Provide a modern `USING redis` SQL experience similar to Spark JDBC.
-- Treat Redis native data types as first-class table mappings.
-- Keep the public option model small and explicit.
-- Build the connector around DataSource V2 read/write contracts.
-- Make standalone Redis work first, then add cluster-aware partition planning.
-
-## Current Scope
-
-The initial connector skeleton supports batch read/write plans for:
-
-- Redis String
-- Redis Hash
-- Redis Set
-- Redis List
-- Redis Sorted Set
+- Spark SQL `USING redis` and DataFrame `.format("redis")` support.
+- Batch read/write support for Redis string, hash, set, list, and sorted set.
+- Redis native data types are exposed as table layouts instead of legacy RDD APIs.
+- Redis key discovery uses `SCAN` for pattern-based reads.
+- A shaded `all` jar is published for local Spark testing.
 
 Redis Streams are intentionally left for a separate design because batch stream reads and structured streaming have different offset and commit semantics.
+
+## Quick Start
+
+Download the latest release jar from GitHub Releases:
+
+```bash
+curl -L -o spark-redis-connector_2.12-0.1.0-all.jar \
+  https://github.com/llphxd/spark-redis-connector/releases/download/v0.1.0/spark-redis-connector_2.12-0.1.0-all.jar
+```
+
+Use the `all` jar when you want a single jar that already includes Jedis and other runtime dependencies.
+
+### Spark SQL CLI
+
+```bash
+spark-sql \
+  --jars spark-redis-connector_2.12-0.1.0-all.jar
+```
+
+Then run:
+
+```sql
+CREATE OR REPLACE TEMPORARY VIEW redis_users (
+  key STRING,
+  name STRING,
+  age INT
+)
+USING redis
+OPTIONS (
+  type='hash',
+  host='localhost',
+  port='6379',
+  keys.pattern='user:*'
+);
+
+SELECT * FROM redis_users;
+```
+
+### Spark Shell
+
+```bash
+spark-shell \
+  --jars spark-redis-connector_2.12-0.1.0-all.jar
+```
+
+```scala
+val users = spark.read
+  .format("redis")
+  .option("type", "hash")
+  .option("host", "localhost")
+  .option("port", "6379")
+  .option("keys.pattern", "user:*")
+  .schema("key STRING, name STRING, age INT")
+  .load()
+
+users.show()
+```
 
 ## SQL Examples
 
 Read Redis strings:
 
 ```sql
-CREATE TEMPORARY VIEW redis_config
+CREATE OR REPLACE TEMPORARY VIEW redis_config
 USING redis
 OPTIONS (
-  host 'localhost',
-  port '6379',
-  type 'string',
-  keys.pattern 'config:*'
+  type='string',
+  keys.pattern='config:*'
 );
 
 SELECT key, value FROM redis_config;
@@ -44,33 +89,29 @@ SELECT key, value FROM redis_config;
 Read Redis hashes as one row per hash field:
 
 ```sql
-CREATE TEMPORARY VIEW redis_hash_fields
+CREATE OR REPLACE TEMPORARY VIEW redis_hash_fields
 USING redis
 OPTIONS (
-  host 'localhost',
-  port '6379',
-  type 'hash',
-  keys.pattern 'user:*'
+  type='hash',
+  keys.pattern='user:*'
 );
 
 SELECT key, field, value FROM redis_hash_fields;
 ```
 
-Read Redis hashes with an explicit schema:
+Read Redis hashes with a custom schema:
 
 ```sql
-CREATE TEMPORARY VIEW redis_users (
+CREATE OR REPLACE TEMPORARY VIEW redis_users (
   key STRING,
   name STRING,
   age INT
 )
 USING redis
 OPTIONS (
-  host 'localhost',
-  port '6379',
-  type 'hash',
-  keys.pattern 'user:*',
-  key.column 'key'
+  type='hash',
+  keys.pattern='user:*',
+  key.column='key'
 );
 
 SELECT key, name, age FROM redis_users;
@@ -79,19 +120,17 @@ SELECT key, name, age FROM redis_users;
 Write Redis hashes:
 
 ```sql
-CREATE TEMPORARY VIEW redis_user_out (
+CREATE OR REPLACE TEMPORARY VIEW redis_user_out (
   id STRING,
   name STRING,
   age INT
 )
 USING redis
 OPTIONS (
-  host 'localhost',
-  port '6379',
-  type 'hash',
-  key.column 'id',
-  key.prefix 'user:',
-  ttl '3600'
+  type='hash',
+  key.column='id',
+  key.prefix='user:',
+  ttl='3600'
 );
 
 INSERT INTO redis_user_out
@@ -106,14 +145,28 @@ Hash writes support two layouts:
 Read sorted sets:
 
 ```sql
-CREATE TEMPORARY VIEW redis_scores
+CREATE OR REPLACE TEMPORARY VIEW redis_scores
 USING redis
 OPTIONS (
-  type 'zset',
-  keys.pattern 'ranking:*'
+  type='zset',
+  keys.pattern='ranking:*'
 );
 
 SELECT key, member, score FROM redis_scores;
+```
+
+Read Redis lists as arrays:
+
+```sql
+CREATE OR REPLACE TEMPORARY VIEW redis_lists
+USING redis
+OPTIONS (
+  type='list',
+  keys.pattern='list:*',
+  list.read.mode='array'
+);
+
+SELECT key, values FROM redis_lists;
 ```
 
 ## DataFrame Examples
@@ -176,25 +229,25 @@ Use a custom schema when you want Spark types other than `STRING`, when you want
 | Option | Applies to | Required | Description | Default |
 | --- | --- | --- | --- | --- |
 | `type` | Read, Write | No | Redis data type: `string`, `hash`, `set`, `list`, `zset` | `hash` |
-| `host` | Read, Write | No | Redis host | `localhost` |
-| `port` | Read, Write | No | Redis port | `6379` |
-| `user` | Read, Write | No | Redis ACL user | unset |
-| `password` / `auth` | Read, Write | No | Redis password | unset |
-| `database` / `dbNum` | Read, Write | No | Redis logical database | `0` |
-| `timeout` | Read, Write | No | Redis connection timeout in milliseconds | `2000` |
-| `keys.pattern` | Read, Overwrite | Conditional | Redis key pattern used for `SCAN` during reads and truncate-style overwrite | unset |
-| `keys` | Read, Overwrite | Conditional | Comma-separated explicit keys used for reads and truncate-style overwrite | unset |
-| `key.column` | Read, Write | No | Spark column that contains the Redis key or receives the Redis key | `key` |
-| `key.prefix` | Write | No | Prefix prepended to written Redis keys | empty |
-| `value.column` | Read, Write | No | Value column for string, set, list, and hash field/value mode | `value` |
-| `field.column` | Read, Write | No | Hash field column in field/value mode | `field` |
-| `member.column` | Read, Write | No | Sorted set member column | `member` |
-| `score.column` | Read, Write | No | Sorted set score column | `score` |
-| `list.read.mode` | Read | No | List read mode: `explode` or `array` | `explode` |
-| `list.write.command` | Write | No | List write command: `lpush` or `rpush` | `rpush` |
-| `scan.count` | Read, Overwrite | No | Redis `SCAN COUNT` hint used during key discovery | `1000` |
-| `keys.per.partition` | Read, Overwrite | No | Maximum discovered keys assigned to each Spark input partition or delete batch | `1000` |
-| `ttl` | Write | No | Expiration in seconds for written keys. `0` means no expiration | `0` |
+| `host` | Read, Write | No | Redis host. Example: `host='localhost'` or `host='redis.example.com'` | `localhost` |
+| `port` | Read, Write | No | Redis port. Example: `port='6379'` | `6379` |
+| `user` | Read, Write | No | Redis ACL user. Example: `user='default'` | unset |
+| `password` / `auth` | Read, Write | No | Redis password. Example: `password='secret'` | unset |
+| `database` / `dbNum` | Read, Write | No | Redis logical database. Example: `database='1'` | `0` |
+| `timeout` | Read, Write | No | Redis connection timeout in milliseconds. Example: `timeout='5000'` | `2000` |
+| `keys.pattern` | Read, Overwrite | Conditional | Redis key pattern used for `SCAN` during reads and truncate-style overwrite. Example: `keys.pattern='user:*'` | unset |
+| `keys` | Read, Overwrite | Conditional | Comma-separated explicit keys used for reads and truncate-style overwrite. Example: `keys='user:1,user:2'` | unset |
+| `key.column` | Read, Write | No | Spark column that contains or receives the Redis key. Example: `key.column='id'` writes row `id=1001` as Redis key `1001` unless `key.prefix` is set | `key` |
+| `key.prefix` | Write | No | Prefix prepended to written Redis keys. Example: `key.prefix='user:'` and `id=1001` writes key `user:1001` | empty |
+| `value.column` | Read, Write | No | Value column for string, set, list, and hash field/value mode. Example: `value.column='payload'` | `value` |
+| `field.column` | Read, Write | No | Hash field column in field/value mode. Example: `field.column='field_name'` | `field` |
+| `member.column` | Read, Write | No | Sorted set member column. Example: `member.column='item'` | `member` |
+| `score.column` | Read, Write | No | Sorted set score column. Example: `score.column='rank_score'` | `score` |
+| `list.read.mode` | Read | No | List read mode: `explode` returns `key,index,value`; `array` returns `key,values`. Example: `list.read.mode='array'` | `explode` |
+| `list.write.command` | Write | No | List write command: `lpush` or `rpush`. Example: `list.write.command='lpush'` | `rpush` |
+| `scan.count` | Read, Overwrite | No | Redis `SCAN COUNT` hint used during key discovery. Example: `scan.count='5000'` | `1000` |
+| `keys.per.partition` | Read, Overwrite | No | Maximum discovered keys assigned to each Spark input partition or delete batch. Example: `keys.per.partition='2000'` | `1000` |
+| `ttl` | Write | No | Expiration in seconds for written keys. `0` means no expiration. Example: `ttl='3600'` | `0` |
 
 For reads, either `keys.pattern` or `keys` is required. For overwrite writes, `keys.pattern` or `keys` is required to identify the keyspace to delete before writing new rows.
 
@@ -213,21 +266,9 @@ For reads, either `keys.pattern` or `keys` is required. For overwrite writes, `k
 
 The common Redis value columns are represented as Spark `STRING`. Sorted set score is represented as Spark `DOUBLE`.
 
-Read Redis lists as arrays:
-
-```sql
-CREATE TEMPORARY VIEW redis_lists
-USING redis
-OPTIONS (
-  type 'list',
-  keys.pattern 'list:*',
-  list.read.mode 'array'
-);
-
-SELECT key, values FROM redis_lists;
-```
-
 ## Build
+
+You do not need to build from source if you use the release jar from GitHub Releases.
 
 ```bash
 mvn test
