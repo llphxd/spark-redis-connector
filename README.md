@@ -19,8 +19,8 @@ Redis Streams are intentionally left for a separate design because batch stream 
 Download the latest release jar from GitHub Releases:
 
 ```bash
-curl -L -o spark-redis-connector_2.12-0.1.0-all.jar \
-  https://github.com/llphxd/spark-redis-connector/releases/download/v0.1.0/spark-redis-connector_2.12-0.1.0-all.jar
+curl -L -o spark-redis-connector_2.12-0.1.1-all.jar \
+  https://github.com/llphxd/spark-redis-connector/releases/download/v0.1.1/spark-redis-connector_2.12-0.1.1-all.jar
 ```
 
 Use the `all` jar when you want a single jar that already includes Jedis and other runtime dependencies.
@@ -29,7 +29,7 @@ Use the `all` jar when you want a single jar that already includes Jedis and oth
 
 ```bash
 spark-sql \
-  --jars spark-redis-connector_2.12-0.1.0-all.jar
+  --jars spark-redis-connector_2.12-0.1.1-all.jar
 ```
 
 Then run:
@@ -55,7 +55,7 @@ SELECT * FROM redis_users;
 
 ```bash
 spark-shell \
-  --jars spark-redis-connector_2.12-0.1.0-all.jar
+  --jars spark-redis-connector_2.12-0.1.1-all.jar
 ```
 
 ```scala
@@ -232,15 +232,13 @@ Use a custom schema when you want Spark types other than `STRING`, when you want
 | `host` | Read, Write | No | Redis host. Example: `host='localhost'` or `host='redis.example.com'` | `localhost` |
 | `port` | Read, Write | No | Redis port. Example: `port='6379'` | `6379` |
 | `user` | Read, Write | No | Redis ACL user. Example: `user='default'` | unset |
-| `password` / `auth` | Read, Write | No | Redis password. Example: `password='secret'` | unset |
-| `database` / `dbNum` | Read, Write | No | Redis logical database. Example: `database='1'` | `0` |
-| `timeout` | Read, Write | No | Legacy shortcut used as both connect and socket timeout when the specific timeout options are not set. Example: `timeout='5000'` | `2000` |
-| `connect.timeout` | Read, Write | No | Redis connection timeout in milliseconds. Example: `connect.timeout='3000'` | `timeout` |
-| `socket.timeout` | Read, Write | No | Redis socket read timeout in milliseconds. Example: `socket.timeout='3000'` | `timeout` |
-| `connection.pool.max.total` / `connection.pool.max-total` | Read, Write | No | Maximum Redis connections in each executor-side pool. Example: `connection.pool.max.total='16'` | `8` |
-| `connection.pool.max.idle` / `connection.pool.max-idle` | Read, Write | No | Maximum idle Redis connections in each executor-side pool. Example: `connection.pool.max.idle='8'` | `8` |
-| `connection.pool.min.idle` / `connection.pool.min-idle` | Read, Write | No | Minimum idle Redis connections in each executor-side pool. Example: `connection.pool.min.idle='1'` | `0` |
-| `ssl.enabled` / `ssl` | Read, Write | No | Enable SSL/TLS. Example: `ssl.enabled='true'` | `false` |
+| `password` | Read, Write | No | Redis password. Example: `password='secret'` | unset |
+| `database` | Read, Write | No | Redis logical database. Example: `database='1'` | `0` |
+| `timeout` | Read, Write | No | Redis connection and socket timeout in milliseconds. Example: `timeout='3000'` | `2000` |
+| `connection.pool.max.total` | Read, Write | No | Maximum Redis connections in each executor-side pool. Example: `connection.pool.max.total='16'` | `8` |
+| `connection.pool.max.idle` | Read, Write | No | Maximum idle Redis connections in each executor-side pool. Example: `connection.pool.max.idle='8'` | `8` |
+| `connection.pool.min.idle` | Read, Write | No | Minimum idle Redis connections in each executor-side pool. Example: `connection.pool.min.idle='1'` | `0` |
+| `ssl.enabled` | Read, Write | No | Enable SSL/TLS. Example: `ssl.enabled='true'` | `false` |
 | `ssl.truststore.path` | Read, Write | No | Truststore path used for SSL/TLS. Example: `ssl.truststore.path='/path/to/redis.jks'` | unset |
 | `ssl.truststore.password` | Read, Write | No | Truststore password used for SSL/TLS. Example: `ssl.truststore.password='changeit'` | unset |
 | `ssl.truststore.type` | Read, Write | No | Truststore type. Example: `ssl.truststore.type='PKCS12'` | `JKS` |
@@ -256,8 +254,7 @@ Use a custom schema when you want Spark types other than `STRING`, when you want
 | `list.write.command` | Write | No | List write command: `lpush` or `rpush`. Example: `list.write.command='lpush'` | `rpush` |
 | `scan.count` | Read, Overwrite | No | Redis `SCAN COUNT` hint used during key discovery. Example: `scan.count='5000'` | `1000` |
 | `keys.per.partition` | Read, Overwrite | No | Maximum discovered keys assigned to each Spark input partition or delete batch. Example: `keys.per.partition='2000'` | `1000` |
-| `write.batch.size` | Write | No | Maximum Spark rows buffered by a writer before syncing the Redis pipeline. Example: `write.batch.size='500'` | `1000` |
-| `write.pipeline.size` / `pipeline.size` | Write | No | Maximum queued Redis commands before syncing the Redis pipeline. Example: `write.pipeline.size='1000'` | `1000` |
+| `write.pipeline.size` | Write | No | Maximum queued Redis commands before syncing the Redis pipeline. Example: `write.pipeline.size='1000'` | `1000` |
 | `ttl` | Write | No | Expiration in seconds for written keys. `0` means no expiration. Example: `ttl='3600'` | `0` |
 
 For reads, either `keys.pattern` or `keys` is required. For overwrite writes, `keys.pattern` or `keys` is required to identify the keyspace to delete before writing new rows.
@@ -293,21 +290,21 @@ mvn package
 
 This creates two jars:
 
-- `target/spark-redis-connector_2.12-0.1.0.jar`: connector classes only.
-- `target/spark-redis-connector_2.12-0.1.0-all.jar`: connector plus runtime dependencies such as Jedis.
+- `target/spark-redis-connector_2.12-0.1.1.jar`: connector classes only.
+- `target/spark-redis-connector_2.12-0.1.1-all.jar`: connector plus runtime dependencies such as Jedis.
 
 For local Spark SQL testing, use the `all` jar:
 
 ```bash
 spark-shell \
-  --jars target/spark-redis-connector_2.12-0.1.0-all.jar
+  --jars target/spark-redis-connector_2.12-0.1.1-all.jar
 ```
 
 ## Design Notes
 
 This repository starts with a small standalone Redis implementation. Batch reads use Redis `SCAN` for pattern-based key discovery and split discovered keys into Spark input partitions with `keys.per.partition`. The scan path supports Spark column pruning, and explicit-schema hash reads use `HMGET` for the selected fields.
 
-Connections are backed by executor-side Jedis pools. Writes are buffered through Redis pipelines and are synced when either `write.batch.size` Spark rows or `write.pipeline.size` Redis commands are queued. Spark still splits work by input partitions/tasks; these options control Redis command flushing inside each writer task.
+Connections are backed by executor-side Jedis pools. Writes are buffered through Redis pipelines and are synced when `write.pipeline.size` Redis commands are queued. Spark still splits work by input partitions/tasks; this option controls Redis command flushing inside each writer task.
 
 The next important engineering steps are:
 

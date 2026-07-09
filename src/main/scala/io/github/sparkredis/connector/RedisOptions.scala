@@ -8,8 +8,7 @@ final case class RedisOptions(
     user: Option[String],
     password: Option[String],
     database: Int,
-    connectTimeoutMillis: Int,
-    socketTimeoutMillis: Int,
+    timeoutMillis: Int,
     poolMaxTotal: Int,
     poolMaxIdle: Int,
     poolMinIdle: Int,
@@ -30,7 +29,6 @@ final case class RedisOptions(
     listWriteCommand: RedisListWriteCommand,
     scanCount: Int,
     keysPerPartition: Int,
-    writeBatchSize: Int,
     writePipelineSize: Int,
     ttlSeconds: Int) extends Serializable
 
@@ -42,20 +40,12 @@ object RedisOptions {
   val Port = "port"
   val User = "user"
   val Password = "password"
-  val Auth = "auth"
   val Database = "database"
-  val DbNum = "dbNum"
   val Timeout = "timeout"
-  val ConnectTimeout = "connect.timeout"
-  val SocketTimeout = "socket.timeout"
   val PoolMaxTotal = "connection.pool.max.total"
-  val PoolMaxTotalAlias = "connection.pool.max-total"
   val PoolMaxIdle = "connection.pool.max.idle"
-  val PoolMaxIdleAlias = "connection.pool.max-idle"
   val PoolMinIdle = "connection.pool.min.idle"
-  val PoolMinIdleAlias = "connection.pool.min-idle"
   val SslEnabled = "ssl.enabled"
-  val Ssl = "ssl"
   val SslTruststorePath = "ssl.truststore.path"
   val SslTruststorePassword = "ssl.truststore.password"
   val SslTruststoreType = "ssl.truststore.type"
@@ -71,33 +61,26 @@ object RedisOptions {
   val ListWriteCommand = "list.write.command"
   val ScanCount = "scan.count"
   val KeysPerPartition = "keys.per.partition"
-  val WriteBatchSize = "write.batch.size"
   val WritePipelineSize = "write.pipeline.size"
-  val PipelineSize = "pipeline.size"
   val Ttl = "ttl"
 
   def from(options: CaseInsensitiveStringMap): RedisOptions = {
     def opt(name: String): Option[String] = Option(options.get(name)).filter(_.nonEmpty)
     def str(name: String, default: String): String = opt(name).getOrElse(default)
     def int(name: String, default: Int): Int = opt(name).map(_.toInt).getOrElse(default)
-    def firstInt(names: Seq[String], default: Int): Int = names.iterator.flatMap(opt).toSeq.headOption.map(_.toInt).getOrElse(default)
-    def firstBool(names: Seq[String], default: Boolean): Boolean =
-      names.iterator.flatMap(opt).toSeq.headOption.map(_.toBoolean).getOrElse(default)
-
-    val legacyTimeoutMillis = int(Timeout, 2000)
+    def bool(name: String, default: Boolean): Boolean = opt(name).map(_.toBoolean).getOrElse(default)
 
     RedisOptions(
       host = str(Host, "localhost"),
       port = int(Port, 6379),
       user = opt(User),
-      password = opt(Password).orElse(opt(Auth)),
-      database = opt(Database).orElse(opt(DbNum)).map(_.toInt).getOrElse(0),
-      connectTimeoutMillis = int(ConnectTimeout, legacyTimeoutMillis),
-      socketTimeoutMillis = int(SocketTimeout, legacyTimeoutMillis),
-      poolMaxTotal = firstInt(Seq(PoolMaxTotal, PoolMaxTotalAlias), 8),
-      poolMaxIdle = firstInt(Seq(PoolMaxIdle, PoolMaxIdleAlias), 8),
-      poolMinIdle = firstInt(Seq(PoolMinIdle, PoolMinIdleAlias), 0),
-      sslEnabled = firstBool(Seq(SslEnabled, Ssl), false),
+      password = opt(Password),
+      database = int(Database, 0),
+      timeoutMillis = int(Timeout, 2000),
+      poolMaxTotal = int(PoolMaxTotal, 8),
+      poolMaxIdle = int(PoolMaxIdle, 8),
+      poolMinIdle = int(PoolMinIdle, 0),
+      sslEnabled = bool(SslEnabled, false),
       sslTruststorePath = opt(SslTruststorePath),
       sslTruststorePassword = opt(SslTruststorePassword),
       sslTruststoreType = str(SslTruststoreType, "JKS"),
@@ -114,8 +97,7 @@ object RedisOptions {
       listWriteCommand = RedisListWriteCommand.parse(str(ListWriteCommand, RedisListWriteCommand.RPush.name)),
       scanCount = int(ScanCount, 1000),
       keysPerPartition = int(KeysPerPartition, 1000),
-      writeBatchSize = int(WriteBatchSize, 1000),
-      writePipelineSize = firstInt(Seq(WritePipelineSize, PipelineSize), 1000),
+      writePipelineSize = int(WritePipelineSize, 1000),
       ttlSeconds = int(Ttl, 0)
     )
   }

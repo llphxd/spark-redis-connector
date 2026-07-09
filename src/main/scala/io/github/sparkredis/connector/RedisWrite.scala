@@ -43,9 +43,7 @@ final case class RedisDataWriterFactory(schema: StructType, options: RedisOption
 class RedisDataWriter(schema: StructType, options: RedisOptions) extends DataWriter[InternalRow] {
   private val jedis = RedisConnection.open(options)
   private val pipeline = jedis.pipelined()
-  private val maxRowsBeforeFlush = math.max(1, options.writeBatchSize)
   private val maxCommandsBeforeFlush = math.max(1, options.writePipelineSize)
-  private var pendingRows = 0
   private var pendingCommands = 0
   private var aborted = false
 
@@ -105,7 +103,6 @@ class RedisDataWriter(schema: StructType, options: RedisOptions) extends DataWri
         recordCommand()
         expireIfNeeded(key)
     }
-    pendingRows += 1
     flushIfNeeded()
   }
 
@@ -135,7 +132,7 @@ class RedisDataWriter(schema: StructType, options: RedisOptions) extends DataWri
   }
 
   private def flushIfNeeded(): Unit = {
-    if (!aborted && (pendingRows >= maxRowsBeforeFlush || pendingCommands >= maxCommandsBeforeFlush)) {
+    if (!aborted && pendingCommands >= maxCommandsBeforeFlush) {
       flush()
     }
   }
@@ -143,7 +140,6 @@ class RedisDataWriter(schema: StructType, options: RedisOptions) extends DataWri
   private def flush(): Unit = {
     if (!aborted && pendingCommands > 0) {
       pipeline.sync()
-      pendingRows = 0
       pendingCommands = 0
     }
   }
