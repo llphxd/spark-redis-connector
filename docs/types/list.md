@@ -85,10 +85,13 @@ items.select("key", "value")
   .save()
 ```
 
-## Options
+## Type-Specific Options
+
+This section lists options most relevant to this Redis type. See the README Core Options section for the full option list.
 
 | Option | Description |
 | --- | --- |
+| `key.prefix` | Prefix stripped from returned Spark keys during reads and prepended to Redis keys during writes. |
 | `list.read.mode` | `explode` or `array`. Default: `explode`. |
 | `list.write.command` | `rpush` or `lpush`. Default: `rpush`. |
 | `value.column` | Column used as the list element on write. Default: `value`. |
