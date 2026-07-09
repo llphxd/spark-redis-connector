@@ -1,4 +1,4 @@
-package io.github.sparkredis.catalyst
+package io.github.sparkredis.connector
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.util.GenericArrayData

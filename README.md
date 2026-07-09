@@ -1,6 +1,6 @@
-# spark-redis-catalyst
+# spark-redis-connector
 
-`spark-redis-catalyst` is a Spark SQL connector for Redis built around Spark DataSource V2.
+`spark-redis-connector` is a Spark SQL connector for Redis built around Spark DataSource V2.
 
 The project intentionally focuses on Spark SQL and DataFrame APIs only. It does not carry the legacy RDD, DStream, Spark Streaming, or DataSource V1 APIs from older Spark Redis connectors.
 
@@ -215,14 +215,14 @@ mvn package
 
 This creates two jars:
 
-- `target/spark-redis-catalyst_2.12-0.1.0-SNAPSHOT.jar`: connector classes only.
-- `target/spark-redis-catalyst_2.12-0.1.0-SNAPSHOT-all.jar`: connector plus runtime dependencies such as Jedis.
+- `target/spark-redis-connector_2.12-0.1.0-SNAPSHOT.jar`: connector classes only.
+- `target/spark-redis-connector_2.12-0.1.0-SNAPSHOT-all.jar`: connector plus runtime dependencies such as Jedis.
 
 For local Spark SQL testing, use the `all` jar:
 
 ```bash
 spark-shell \
-  --jars target/spark-redis-catalyst_2.12-0.1.0-SNAPSHOT-all.jar
+  --jars target/spark-redis-connector_2.12-0.1.0-SNAPSHOT-all.jar
 ```
 
 ## Design Notes
