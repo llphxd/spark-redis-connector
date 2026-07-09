@@ -215,14 +215,14 @@ mvn package
 
 This creates two jars:
 
-- `target/spark-redis-connector_2.12-0.1.0-SNAPSHOT.jar`: connector classes only.
-- `target/spark-redis-connector_2.12-0.1.0-SNAPSHOT-all.jar`: connector plus runtime dependencies such as Jedis.
+- `target/spark-redis-connector_2.12-0.1.0.jar`: connector classes only.
+- `target/spark-redis-connector_2.12-0.1.0-all.jar`: connector plus runtime dependencies such as Jedis.
 
 For local Spark SQL testing, use the `all` jar:
 
 ```bash
 spark-shell \
-  --jars target/spark-redis-connector_2.12-0.1.0-SNAPSHOT-all.jar
+  --jars target/spark-redis-connector_2.12-0.1.0-all.jar
 ```
 
 ## Design Notes
