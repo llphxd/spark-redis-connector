@@ -30,7 +30,8 @@ CREATE OR REPLACE TEMPORARY VIEW redis_hash_fields
 USING redis
 OPTIONS (
   type='hash',
-  keys.pattern='user:*'
+  keys.pattern='user:*',
+  key.prefix='user:'
 );
 
 SELECT key, field, value FROM redis_hash_fields;
@@ -47,7 +48,8 @@ CREATE OR REPLACE TEMPORARY VIEW redis_users (
 USING redis
 OPTIONS (
   type='hash',
-  keys.pattern='user:*'
+  keys.pattern='user:*',
+  key.prefix='user:'
 );
 
 SELECT key, name, age FROM redis_users;
@@ -95,10 +97,13 @@ users.write
   .save()
 ```
 
-## Options
+## Type-Specific Options
+
+This section lists options most relevant to this Redis type. See the README Core Options section for the full option list.
 
 | Option | Description |
 | --- | --- |
+| `key.prefix` | Prefix stripped from returned Spark keys during reads and prepended to Redis keys during writes. |
 | `field.column` | Column used as the hash field in field/value layout. Default: `field`. |
 | `value.column` | Column used as the hash value in field/value layout. Default: `value`. |
 | `ttl` | Expiration in seconds for written keys. Default: `0`, meaning no expiration. |

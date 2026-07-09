@@ -28,11 +28,12 @@ class RedisPartitionReader(schema: StructType, options: RedisOptions, keys: Seq[
   override def close(): Unit = jedis.close()
 
   private def readKey(key: String): Iterator[InternalRow] = {
+    val logicalKey = RedisKeyCodec.toLogicalKey(key, options)
     try {
       options.dataType match {
         case RedisDataType.StringValue =>
           val values = Map.newBuilder[String, Any]
-          values += options.keyColumn -> key
+          values += options.keyColumn -> logicalKey
           if (schema.fieldNames.contains(options.valueColumn)) {
             values += options.valueColumn -> jedis.get(key)
           }
@@ -40,24 +41,24 @@ class RedisPartitionReader(schema: StructType, options: RedisOptions, keys: Seq[
 
         case RedisDataType.Hash if schema.fieldNames.contains(options.fieldColumn) =>
           jedis.hgetAll(key).asScala.iterator.map { case (field, value) =>
-            row(Map(options.keyColumn -> key, options.fieldColumn -> field, options.valueColumn -> value))
+            row(Map(options.keyColumn -> logicalKey, options.fieldColumn -> field, options.valueColumn -> value))
           }
 
         case RedisDataType.Hash =>
-          Iterator(readHashRow(key))
+          Iterator(readHashRow(key, logicalKey))
 
         case RedisDataType.SetValue =>
           jedis.smembers(key).asScala.iterator.map { value =>
-            row(Map(options.keyColumn -> key, options.valueColumn -> value))
+            row(Map(options.keyColumn -> logicalKey, options.valueColumn -> value))
           }
 
         case RedisDataType.ListValue =>
-          readList(key)
+          readList(key, logicalKey)
 
         case RedisDataType.SortedSet =>
           jedis.zrangeWithScores(key, 0, -1).asScala.iterator.map { tuple =>
             row(Map(
-              options.keyColumn -> key,
+              options.keyColumn -> logicalKey,
               options.memberColumn -> tuple.getElement,
               options.scoreColumn -> tuple.getScore
             ))
@@ -68,25 +69,25 @@ class RedisPartitionReader(schema: StructType, options: RedisOptions, keys: Seq[
     }
   }
 
-  private def readHashRow(key: String): InternalRow = {
+  private def readHashRow(key: String, logicalKey: String): InternalRow = {
     val fields = schema.fields.map(_.name).filterNot(_ == options.keyColumn)
     if (fields.isEmpty) {
-      row(Map(options.keyColumn -> key))
+      row(Map(options.keyColumn -> logicalKey))
     } else {
       val values = jedis.hmget(key, fields: _*).asScala
-      row((fields.zip(values) :+ (options.keyColumn -> key)).toMap)
+      row((fields.zip(values) :+ (options.keyColumn -> logicalKey)).toMap)
     }
   }
 
-  private def readList(key: String): Iterator[InternalRow] = {
+  private def readList(key: String, logicalKey: String): Iterator[InternalRow] = {
     val values = jedis.lrange(key, 0, -1).asScala
     options.listReadMode match {
       case RedisListReadMode.Explode =>
         values.iterator.zipWithIndex.map { case (value, index) =>
-          row(Map(options.keyColumn -> key, "index" -> index.toLong, options.valueColumn -> value))
+          row(Map(options.keyColumn -> logicalKey, "index" -> index.toLong, options.valueColumn -> value))
         }
       case RedisListReadMode.Array =>
-        Iterator(row(Map(options.keyColumn -> key, "values" -> values.toSeq)))
+        Iterator(row(Map(options.keyColumn -> logicalKey, "values" -> values.toSeq)))
     }
   }
 
