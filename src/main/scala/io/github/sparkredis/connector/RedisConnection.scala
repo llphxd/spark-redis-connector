@@ -1,4 +1,4 @@
-package io.github.sparkredis.catalyst
+package io.github.sparkredis.connector
 
 import redis.clients.jedis.Jedis
 

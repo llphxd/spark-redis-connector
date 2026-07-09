@@ -1,4 +1,4 @@
-package io.github.sparkredis.catalyst
+package io.github.sparkredis.connector
 
 import redis.clients.jedis.params.ScanParams
 import redis.clients.jedis.resps.ScanResult
