@@ -148,29 +148,55 @@ users.write
   .save()
 ```
 
+## Schema Usage
+
+Spark can infer a default schema for each Redis data type when you do not declare one in SQL or DataFrame code. Use the default schema when you want to inspect Redis data in its natural connector layout.
+
+For `string`, `set`, and `zset`, the default schemas are usually enough because these types have a fixed row shape:
+
+- `string`: `key STRING, value STRING`
+- `set`: `key STRING, value STRING`
+- `zset`: `key STRING, member STRING, score DOUBLE`
+
+For `list`, the default read schema depends on `list.read.mode`:
+
+- `explode`: `key STRING, index LONG, value STRING`, one Spark row per Redis list element.
+- `array`: `key STRING, values ARRAY<STRING>`, one Spark row per Redis list key.
+
+For `hash`, schema choice changes the table shape:
+
+- Without a custom schema, hashes are read as `key STRING, field STRING, value STRING`. This is best for discovering unknown or inconsistent hash fields.
+- With a custom schema such as `key STRING, name STRING, age INT`, each Redis hash key becomes one Spark row, and each non-key column name is read from the matching Redis hash field with `HMGET`.
+- For writes, a schema containing `field` and `value` uses field/value layout (`HSET key field value`). A schema without `field` uses flattened layout, where every non-key column is written as a Redis hash field.
+
+Use a custom schema when you want Spark types other than `STRING`, when you want a wide table for Redis hashes, or when your write path needs explicit column names such as `key`, `field`, `value`, `member`, or `score`.
+
 ## Core Options
 
-| Option | Description | Default |
-| --- | --- | --- |
-| `type` | Redis data type: `string`, `hash`, `set`, `list`, `zset` | `hash` |
-| `host` | Redis host | `localhost` |
-| `port` | Redis port | `6379` |
-| `user` | Redis ACL user | unset |
-| `password` / `auth` | Redis password | unset |
-| `database` / `dbNum` | Redis logical database | `0` |
-| `keys.pattern` | Redis key pattern for batch reads | unset |
-| `keys` | Comma-separated explicit keys for batch reads | unset |
-| `key.column` | Spark column used as the Redis key when writing | `key` |
-| `key.prefix` | Prefix prepended to written keys | empty |
-| `value.column` | Value column for string, set, list, and hash field mode | `value` |
-| `field.column` | Hash field column in field/value mode | `field` |
-| `member.column` | Sorted set member column | `member` |
-| `score.column` | Sorted set score column | `score` |
-| `list.read.mode` | List read mode: `explode` or `array` | `explode` |
-| `list.write.command` | List write command: `lpush` or `rpush` | `rpush` |
-| `scan.count` | Redis `SCAN COUNT` hint used during key discovery | `1000` |
-| `keys.per.partition` | Maximum discovered keys assigned to each Spark input partition | `1000` |
-| `ttl` | Expiration in seconds for written keys | `0` |
+| Option | Applies to | Required | Description | Default |
+| --- | --- | --- | --- | --- |
+| `type` | Read, Write | No | Redis data type: `string`, `hash`, `set`, `list`, `zset` | `hash` |
+| `host` | Read, Write | No | Redis host | `localhost` |
+| `port` | Read, Write | No | Redis port | `6379` |
+| `user` | Read, Write | No | Redis ACL user | unset |
+| `password` / `auth` | Read, Write | No | Redis password | unset |
+| `database` / `dbNum` | Read, Write | No | Redis logical database | `0` |
+| `timeout` | Read, Write | No | Redis connection timeout in milliseconds | `2000` |
+| `keys.pattern` | Read, Overwrite | Conditional | Redis key pattern used for `SCAN` during reads and truncate-style overwrite | unset |
+| `keys` | Read, Overwrite | Conditional | Comma-separated explicit keys used for reads and truncate-style overwrite | unset |
+| `key.column` | Read, Write | No | Spark column that contains the Redis key or receives the Redis key | `key` |
+| `key.prefix` | Write | No | Prefix prepended to written Redis keys | empty |
+| `value.column` | Read, Write | No | Value column for string, set, list, and hash field/value mode | `value` |
+| `field.column` | Read, Write | No | Hash field column in field/value mode | `field` |
+| `member.column` | Read, Write | No | Sorted set member column | `member` |
+| `score.column` | Read, Write | No | Sorted set score column | `score` |
+| `list.read.mode` | Read | No | List read mode: `explode` or `array` | `explode` |
+| `list.write.command` | Write | No | List write command: `lpush` or `rpush` | `rpush` |
+| `scan.count` | Read, Overwrite | No | Redis `SCAN COUNT` hint used during key discovery | `1000` |
+| `keys.per.partition` | Read, Overwrite | No | Maximum discovered keys assigned to each Spark input partition or delete batch | `1000` |
+| `ttl` | Write | No | Expiration in seconds for written keys. `0` means no expiration | `0` |
+
+For reads, either `keys.pattern` or `keys` is required. For overwrite writes, `keys.pattern` or `keys` is required to identify the keyspace to delete before writing new rows.
 
 ## Type Layouts
 
