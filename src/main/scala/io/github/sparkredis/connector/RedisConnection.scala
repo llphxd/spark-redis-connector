@@ -23,8 +23,8 @@ object RedisConnection {
     poolConfig.setMinIdle(options.poolMinIdle)
 
     val clientConfigBuilder = DefaultJedisClientConfig.builder()
-      .connectionTimeoutMillis(options.connectTimeoutMillis)
-      .socketTimeoutMillis(options.socketTimeoutMillis)
+      .connectionTimeoutMillis(options.timeoutMillis)
+      .socketTimeoutMillis(options.timeoutMillis)
       .database(options.database)
       .ssl(options.sslEnabled)
 
@@ -66,8 +66,7 @@ private final case class RedisPoolKey(
     user: Option[String],
     password: Option[String],
     database: Int,
-    connectTimeoutMillis: Int,
-    socketTimeoutMillis: Int,
+    timeoutMillis: Int,
     poolMaxTotal: Int,
     poolMaxIdle: Int,
     poolMinIdle: Int,
@@ -84,8 +83,7 @@ private object RedisPoolKey {
       user = options.user,
       password = options.password,
       database = options.database,
-      connectTimeoutMillis = options.connectTimeoutMillis,
-      socketTimeoutMillis = options.socketTimeoutMillis,
+      timeoutMillis = options.timeoutMillis,
       poolMaxTotal = options.poolMaxTotal,
       poolMaxIdle = options.poolMaxIdle,
       poolMinIdle = options.poolMinIdle,
