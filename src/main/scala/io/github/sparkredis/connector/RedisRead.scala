@@ -9,14 +9,20 @@ class RedisScanBuilder(schema: StructType, options: RedisOptions)
     with SupportsPushDownRequiredColumns {
   private var requiredSchema: StructType = schema
 
+  // Whether hash keys are read in field/value "explode" mode. This MUST be decided from the full
+  // table schema, not from the (possibly pruned) required schema. Otherwise a query that prunes the
+  // field column (e.g. `SELECT key, value` or `SELECT count(*)`) would silently flip to wide-hash
+  // mode and return wrong data.
+  private val hashFieldMode: Boolean = schema.fieldNames.contains(options.fieldColumn)
+
   override def pruneColumns(requiredSchema: StructType): Unit = {
     this.requiredSchema = requiredSchema
   }
 
-  override def build(): Scan = new RedisScan(requiredSchema, options)
+  override def build(): Scan = new RedisScan(requiredSchema, options, hashFieldMode)
 }
 
-class RedisScan(schema: StructType, options: RedisOptions) extends Scan with Batch {
+class RedisScan(schema: StructType, options: RedisOptions, hashFieldMode: Boolean) extends Scan with Batch {
   override def readSchema(): StructType = schema
 
   override def toBatch: Batch = this
@@ -31,15 +37,15 @@ class RedisScan(schema: StructType, options: RedisOptions) extends Scan with Bat
   }
 
   override def createReaderFactory(): PartitionReaderFactory = {
-    RedisPartitionReaderFactory(schema, options)
+    RedisPartitionReaderFactory(schema, options, hashFieldMode)
   }
 }
 
 final case class RedisInputPartition(keys: Seq[String]) extends InputPartition
 
-final case class RedisPartitionReaderFactory(schema: StructType, options: RedisOptions)
+final case class RedisPartitionReaderFactory(schema: StructType, options: RedisOptions, hashFieldMode: Boolean)
     extends PartitionReaderFactory {
   override def createReader(partition: InputPartition): PartitionReader[InternalRow] = {
-    new RedisPartitionReader(schema, options, partition.asInstanceOf[RedisInputPartition].keys)
+    new RedisPartitionReader(schema, options, hashFieldMode, partition.asInstanceOf[RedisInputPartition].keys)
   }
 }

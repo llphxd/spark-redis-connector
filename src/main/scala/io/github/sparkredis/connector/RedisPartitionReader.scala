@@ -7,7 +7,7 @@ import redis.clients.jedis.exceptions.JedisDataException
 
 import scala.collection.JavaConverters._
 
-class RedisPartitionReader(schema: StructType, options: RedisOptions, keys: Seq[String])
+class RedisPartitionReader(schema: StructType, options: RedisOptions, hashFieldMode: Boolean, keys: Seq[String])
     extends PartitionReader[InternalRow] {
 
   private val jedis = RedisConnection.open(options)
@@ -39,7 +39,7 @@ class RedisPartitionReader(schema: StructType, options: RedisOptions, keys: Seq[
           }
           Iterator(row(values.result()))
 
-        case RedisDataType.Hash if schema.fieldNames.contains(options.fieldColumn) =>
+        case RedisDataType.Hash if hashFieldMode =>
           jedis.hgetAll(key).asScala.iterator.map { case (field, value) =>
             row(Map(options.keyColumn -> logicalKey, options.fieldColumn -> field, options.valueColumn -> value))
           }
