@@ -48,6 +48,9 @@ class RedisDataWriter(schema: StructType, options: RedisOptions) extends DataWri
   private val maxCommandsBeforeFlush = math.max(1, options.writePipelineSize)
   private var pendingCommands = 0
   private var aborted = false
+  // Keys whose TTL has already been set in this task, so EXPIRE is issued once per key instead of
+  // once per row.
+  private val expiredKeys = scala.collection.mutable.HashSet.empty[String]
 
   override def write(record: InternalRow): Unit = {
     val logicalKey = RedisRowCodec.stringAt(record, schema, options.keyColumn)
@@ -129,7 +132,7 @@ class RedisDataWriter(schema: StructType, options: RedisOptions) extends DataWri
   }
 
   private def expireIfNeeded(key: String): Unit = {
-    if (options.ttlSeconds > 0) {
+    if (options.ttlSeconds > 0 && expiredKeys.add(key)) {
       pipeline.expire(key, options.ttlSeconds.toLong)
       recordCommand()
     }
