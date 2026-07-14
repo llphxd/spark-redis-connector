@@ -33,20 +33,22 @@ Spark `3.2.x` 及以下、Spark `4.x` 及以上未在当前 release 中声明支
 
 ## 快速开始
 
-从 GitHub Releases 下载最新 release jar：
+从 [GitHub Releases](https://github.com/llphxd/spark-redis-connector/releases/latest) 下载最新 release jar：
 
 ```bash
-curl -L -o spark-redis-connector_2.12-0.1.2-all.jar \
-  https://github.com/llphxd/spark-redis-connector/releases/download/v0.1.2/spark-redis-connector_2.12-0.1.2-all.jar
+curl -L -o spark-redis-connector_2.12-all.jar \
+  https://github.com/llphxd/spark-redis-connector/releases/latest/download/spark-redis-connector_2.12-all.jar
 ```
 
 推荐使用 `all` jar，因为它已经包含 Jedis 和其他运行时依赖。
+
+每个 release 也会附带带版本号的文件，例如 `spark-redis-connector_2.12-<version>-all.jar`，需要固定版本时可从 Release 页下载。
 
 ### Spark SQL CLI
 
 ```bash
 spark-sql \
-  --jars spark-redis-connector_2.12-0.1.2-all.jar
+  --jars spark-redis-connector_2.12-all.jar
 ```
 
 然后执行：
@@ -75,7 +77,7 @@ SELECT * FROM redis_users;
 
 ```bash
 spark-shell \
-  --jars spark-redis-connector_2.12-0.1.2-all.jar
+  --jars spark-redis-connector_2.12-all.jar
 ```
 
 ```scala
@@ -203,16 +205,16 @@ mvn test
 mvn package
 ```
 
-构建后会生成两个 jar：
+构建后会生成两个 jar（版本号来自 `pom.xml`）：
 
-- `target/spark-redis-connector_2.12-0.1.2.jar`：仅包含 connector classes。
-- `target/spark-redis-connector_2.12-0.1.2-all.jar`：包含 connector 和 Jedis 等运行时依赖。
+- `spark-redis-connector_2.12-<version>.jar`：仅包含 connector classes。
+- `spark-redis-connector_2.12-<version>-all.jar`：包含 connector 和 Jedis 等运行时依赖。
 
 本地 Spark SQL 测试推荐使用 `all` jar：
 
 ```bash
 spark-shell \
-  --jars target/spark-redis-connector_2.12-0.1.2-all.jar
+  --jars target/spark-redis-connector_2.12-*-all.jar
 ```
 
 ## 设计说明
