@@ -5,7 +5,7 @@ import java.security.KeyStore
 import javax.net.ssl.{SSLContext, SSLSocketFactory, TrustManagerFactory}
 
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig
-import redis.clients.jedis.{DefaultJedisClientConfig, HostAndPort, Jedis, JedisPool}
+import redis.clients.jedis.{DefaultJedisClientConfig, HostAndPort, Jedis, JedisClientConfig, JedisPool}
 
 import scala.collection.concurrent.TrieMap
 
@@ -27,12 +27,24 @@ object RedisConnection {
     pools.clear()
   }
 
+  /**
+   * Open a dedicated, non-pooled connection. Closing it closes the underlying socket, which lets a
+   * writer discard any pipeline commands buffered but not yet sent (see RedisDataWriter.abort).
+   */
+  def openStandalone(options: RedisOptions): Jedis = {
+    new Jedis(new HostAndPort(options.host, options.port), buildClientConfig(options))
+  }
+
   private def createPool(options: RedisOptions): JedisPool = {
     val poolConfig = new GenericObjectPoolConfig[Jedis]()
     poolConfig.setMaxTotal(options.poolMaxTotal)
     poolConfig.setMaxIdle(options.poolMaxIdle)
     poolConfig.setMinIdle(options.poolMinIdle)
 
+    new JedisPool(poolConfig, new HostAndPort(options.host, options.port), buildClientConfig(options))
+  }
+
+  private def buildClientConfig(options: RedisOptions): JedisClientConfig = {
     val clientConfigBuilder = DefaultJedisClientConfig.builder()
       .connectionTimeoutMillis(options.timeoutMillis)
       .socketTimeoutMillis(options.timeoutMillis)
@@ -43,7 +55,7 @@ object RedisConnection {
     options.password.foreach(clientConfigBuilder.password)
     sslSocketFactory(options).foreach(clientConfigBuilder.sslSocketFactory)
 
-    new JedisPool(poolConfig, new HostAndPort(options.host, options.port), clientConfigBuilder.build())
+    clientConfigBuilder.build()
   }
 
   private def sslSocketFactory(options: RedisOptions): Option[SSLSocketFactory] = {
