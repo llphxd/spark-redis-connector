@@ -12,8 +12,19 @@ import scala.collection.concurrent.TrieMap
 object RedisConnection {
   private val pools = TrieMap.empty[RedisPoolKey, JedisPool]
 
+  // Close all cached pools when the JVM shuts down (driver or executor) so connections are not
+  // leaked for the lifetime of the process.
+  sys.addShutdownHook(closeAll())
+
   def open(options: RedisOptions): Jedis = {
     pools.getOrElseUpdate(RedisPoolKey.from(options), createPool(options)).getResource
+  }
+
+  def closeAll(): Unit = {
+    pools.values.foreach { pool =>
+      try pool.close() catch { case _: Throwable => () }
+    }
+    pools.clear()
   }
 
   private def createPool(options: RedisOptions): JedisPool = {
