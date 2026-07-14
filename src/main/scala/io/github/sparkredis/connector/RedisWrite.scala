@@ -41,7 +41,9 @@ final case class RedisDataWriterFactory(schema: StructType, options: RedisOption
 }
 
 class RedisDataWriter(schema: StructType, options: RedisOptions) extends DataWriter[InternalRow] {
-  private val jedis = RedisConnection.open(options)
+  // Use a dedicated (non-pooled) connection: on abort we close the socket to discard any buffered
+  // pipeline commands, which would corrupt a shared pooled connection if it were returned.
+  private val jedis = RedisConnection.openStandalone(options)
   private val pipeline = jedis.pipelined()
   private val maxCommandsBeforeFlush = math.max(1, options.writePipelineSize)
   private var pendingCommands = 0
@@ -116,8 +118,14 @@ class RedisDataWriter(schema: StructType, options: RedisOptions) extends DataWri
   }
 
   override def close(): Unit = {
-    pipeline.close()
-    jedis.close()
+    if (aborted) {
+      // Close the socket directly without syncing so buffered-but-unsent commands are discarded.
+      // Note: writes are not transactional, so rows already flushed to Redis remain.
+      jedis.close()
+    } else {
+      pipeline.close()
+      jedis.close()
+    }
   }
 
   private def expireIfNeeded(key: String): Unit = {
