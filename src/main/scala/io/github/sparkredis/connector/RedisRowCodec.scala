@@ -6,8 +6,6 @@ import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 
-import scala.collection.JavaConverters._
-
 object RedisRowCodec {
   def row(values: Seq[Any], schema: StructType): InternalRow = {
     new GenericInternalRow(values.zip(schema.fields).map {
@@ -42,12 +40,6 @@ object RedisRowCodec {
     fromCatalyst(row, index, schema(index).dataType)
   }
 
-  def optionalStringAt(row: InternalRow, schema: StructType, column: String): Option[String] = {
-    schema.fields.zipWithIndex.find(_._1.name == column).flatMap { case (field, index) =>
-      Option(fromCatalyst(row, index, field.dataType))
-    }
-  }
-
   private def toCatalyst(value: String, dataType: DataType): Any = {
     if (value == null) {
       null
@@ -76,12 +68,5 @@ object RedisRowCodec {
         }.toArray)
       case _ => value
     }
-  }
-
-  def hashRow(key: String, values: java.util.Map[String, String], schema: StructType, keyColumn: String): InternalRow = {
-    val scalaValues = values.asScala
-    row(schema.fields.map { field =>
-      if (field.name == keyColumn) key else scalaValues.getOrElse(field.name, null)
-    }, schema)
   }
 }
