@@ -33,22 +33,25 @@ Spark `3.2.x` and earlier, and Spark `4.x` and later, are not declared as suppor
 
 ## Quick Start
 
-Download the latest release jar from [GitHub Releases](https://github.com/llphxd/spark-redis-connector/releases/latest):
+Download a release jar from [GitHub Releases](https://github.com/llphxd/spark-redis-connector/releases). Each release provides two artifacts:
+
+- `spark-redis-connector_2.12-<version>-all.jar` — connector plus shaded runtime dependencies (**recommended** for Spark `--jars`)
+- `spark-redis-connector_2.12-<version>.jar` — connector classes only
+
+Replace `<version>` with the release version (for example `0.1.3`) and `v<version>` with the git tag (for example `v0.1.3`):
 
 ```bash
-curl -L -o spark-redis-connector_2.12-all.jar \
-  https://github.com/llphxd/spark-redis-connector/releases/latest/download/spark-redis-connector_2.12-all.jar
+curl -L -o spark-redis-connector_2.12-<version>-all.jar \
+  https://github.com/llphxd/spark-redis-connector/releases/download/v<version>/spark-redis-connector_2.12-<version>-all.jar
 ```
 
 Use the `all` jar when you want a single jar that already includes Jedis and other runtime dependencies.
-
-Each release also publishes versioned artifacts such as `spark-redis-connector_2.12-<version>-all.jar` if you need a specific version.
 
 ### Spark SQL CLI
 
 ```bash
 spark-sql \
-  --jars spark-redis-connector_2.12-all.jar
+  --jars spark-redis-connector_2.12-<version>-all.jar
 ```
 
 Then run:
@@ -75,7 +78,7 @@ SELECT * FROM redis_users;
 
 ```bash
 spark-shell \
-  --jars spark-redis-connector_2.12-all.jar
+  --jars spark-redis-connector_2.12-<version>-all.jar
 ```
 
 ```scala
@@ -211,7 +214,7 @@ For local Spark SQL testing, use the `all` jar:
 
 ```bash
 spark-shell \
-  --jars target/spark-redis-connector_2.12-*-all.jar
+  --jars target/spark-redis-connector_2.12-<version>-all.jar
 ```
 
 ## Design Notes
