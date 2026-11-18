@@ -25,6 +25,7 @@ class RedisWrite(schema: StructType, options: RedisOptions, truncateRequested: B
 
 class RedisBatchWrite(schema: StructType, options: RedisOptions, truncateRequested: Boolean) extends BatchWrite {
   override def createBatchWriterFactory(info: PhysicalWriteInfo): DataWriterFactory = {
+    validateSchema()
     if (truncateRequested) {
       RedisKeyScanner.deleteKeys(options)
     }
@@ -34,6 +35,23 @@ class RedisBatchWrite(schema: StructType, options: RedisOptions, truncateRequest
   override def commit(messages: Array[WriterCommitMessage]): Unit = {}
 
   override def abort(messages: Array[WriterCommitMessage]): Unit = {}
+
+  private def validateSchema(): Unit = {
+    val columns = schema.fieldNames.toSet
+    val valueColumns = options.dataType match {
+      case RedisDataType.StringValue | RedisDataType.SetValue | RedisDataType.ListValue =>
+        Seq(options.valueColumn)
+      case RedisDataType.Hash if columns.contains(options.fieldColumn) =>
+        Seq(options.valueColumn)
+      case RedisDataType.Hash => Seq.empty
+      case RedisDataType.SortedSet => Seq(options.memberColumn, options.scoreColumn)
+    }
+    val missing = (options.keyColumn +: valueColumns).distinct.filterNot(columns.contains)
+    if (missing.nonEmpty) {
+      throw new IllegalArgumentException(
+        s"Redis ${options.dataType.name} write is missing required columns: ${missing.mkString(", ")}")
+    }
+  }
 }
 
 final case class RedisDataWriterFactory(schema: StructType, options: RedisOptions) extends DataWriterFactory {

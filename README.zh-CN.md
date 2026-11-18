@@ -143,6 +143,8 @@ users.write
 
 当 `keys` 或 `keys.pattern` 标识目标 keyspace 时，支持 truncate 风格的 overwrite。
 
+连接器会在删除 key 前检查输入 schema 是否包含必需列。删除直接使用配置的 key 列表或 pattern，可以匹配不同 Redis 类型和前缀的 key。如果在删除后写入失败，目标可能为空或只包含部分新数据。
+
 ## 类型文档
 
 连接器支持 Redis 五种核心数据类型的批读写。每种类型的 schema、SQL 示例、DataFrame 示例和类型相关参数见详细文档。

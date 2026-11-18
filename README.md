@@ -140,6 +140,8 @@ users.write
 
 Overwrite is supported as truncate-style overwrite when `keys` or `keys.pattern` identifies the target keyspace.
 
+The connector checks that the input schema contains the required columns before deleting keys. Deletion uses the supplied key list or pattern directly, across Redis types and prefixes. If the write fails after deletion, the target can be empty or contain only part of the new data.
+
 ## Type Documentation
 
 The connector supports batch reads and writes for the five core Redis data types. See the detailed type guides for schemas, SQL examples, DataFrame examples, and type-specific options.
