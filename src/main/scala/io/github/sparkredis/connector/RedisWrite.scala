@@ -3,8 +3,10 @@ package io.github.sparkredis.connector
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.connector.write._
 import org.apache.spark.sql.types.StructType
+import redis.clients.jedis.{Jedis, Response}
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable.ArrayBuffer
 
 class RedisWriteBuilder(schema: StructType, options: RedisOptions) extends WriteBuilder with SupportsTruncate {
   private var truncateRequested = false
@@ -40,13 +42,16 @@ final case class RedisDataWriterFactory(schema: StructType, options: RedisOption
   }
 }
 
-class RedisDataWriter(schema: StructType, options: RedisOptions) extends DataWriter[InternalRow] {
+class RedisDataWriter private[connector] (schema: StructType, options: RedisOptions, jedis: Jedis)
+    extends DataWriter[InternalRow] {
   // Use a dedicated (non-pooled) connection: on abort we close the socket to discard any buffered
   // pipeline commands, which would corrupt a shared pooled connection if it were returned.
-  private val jedis = RedisConnection.openStandalone(options)
+  def this(schema: StructType, options: RedisOptions) =
+    this(schema, options, RedisConnection.openStandalone(options))
+
   private val pipeline = jedis.pipelined()
   private val maxCommandsBeforeFlush = math.max(1, options.writePipelineSize)
-  private var pendingCommands = 0
+  private val pendingResponses = ArrayBuffer.empty[Response[_]]
   private var aborted = false
   // Keys whose TTL has already been set in this task, so EXPIRE is issued once per key instead of
   // once per row.
@@ -60,17 +65,15 @@ class RedisDataWriter(schema: StructType, options: RedisOptions) extends DataWri
       case RedisDataType.StringValue =>
         val value = RedisRowCodec.stringAt(record, schema, options.valueColumn)
         if (options.ttlSeconds > 0) {
-          pipeline.setex(key, options.ttlSeconds.toLong, value)
+          pendingResponses += pipeline.setex(key, options.ttlSeconds.toLong, value)
         } else {
-          pipeline.set(key, value)
+          pendingResponses += pipeline.set(key, value)
         }
-        recordCommand()
 
       case RedisDataType.Hash if schema.fieldNames.contains(options.fieldColumn) =>
         val field = RedisRowCodec.stringAt(record, schema, options.fieldColumn)
         val value = RedisRowCodec.stringAt(record, schema, options.valueColumn)
-        pipeline.hset(key, field, value)
-        recordCommand()
+        pendingResponses += pipeline.hset(key, field, value)
         expireIfNeeded(key)
 
       case RedisDataType.Hash =>
@@ -82,30 +85,26 @@ class RedisDataWriter(schema: StructType, options: RedisOptions) extends DataWri
           }
         }.toMap
         if (values.nonEmpty) {
-          pipeline.hset(key, values.asJava)
-          recordCommand()
+          pendingResponses += pipeline.hset(key, values.asJava)
         }
         expireIfNeeded(key)
 
       case RedisDataType.SetValue =>
-        pipeline.sadd(key, RedisRowCodec.stringAt(record, schema, options.valueColumn))
-        recordCommand()
+        pendingResponses += pipeline.sadd(key, RedisRowCodec.stringAt(record, schema, options.valueColumn))
         expireIfNeeded(key)
 
       case RedisDataType.ListValue =>
         val value = RedisRowCodec.stringAt(record, schema, options.valueColumn)
         options.listWriteCommand match {
-          case RedisListWriteCommand.LPush => pipeline.lpush(key, value)
-          case RedisListWriteCommand.RPush => pipeline.rpush(key, value)
+          case RedisListWriteCommand.LPush => pendingResponses += pipeline.lpush(key, value)
+          case RedisListWriteCommand.RPush => pendingResponses += pipeline.rpush(key, value)
         }
-        recordCommand()
         expireIfNeeded(key)
 
       case RedisDataType.SortedSet =>
         val member = RedisRowCodec.stringAt(record, schema, options.memberColumn)
         val score = RedisRowCodec.stringAt(record, schema, options.scoreColumn).toDouble
-        pipeline.zadd(key, score, member)
-        recordCommand()
+        pendingResponses += pipeline.zadd(key, score, member)
         expireIfNeeded(key)
     }
     flushIfNeeded()
@@ -133,25 +132,22 @@ class RedisDataWriter(schema: StructType, options: RedisOptions) extends DataWri
 
   private def expireIfNeeded(key: String): Unit = {
     if (options.ttlSeconds > 0 && expiredKeys.add(key)) {
-      pipeline.expire(key, options.ttlSeconds.toLong)
-      recordCommand()
+      pendingResponses += pipeline.expire(key, options.ttlSeconds.toLong)
     }
   }
 
-  private def recordCommand(): Unit = {
-    pendingCommands += 1
-  }
-
   private def flushIfNeeded(): Unit = {
-    if (!aborted && pendingCommands >= maxCommandsBeforeFlush) {
+    if (pendingResponses.size >= maxCommandsBeforeFlush) {
       flush()
     }
   }
 
   private def flush(): Unit = {
-    if (!aborted && pendingCommands > 0) {
+    if (!aborted && pendingResponses.nonEmpty) {
       pipeline.sync()
-      pendingCommands = 0
+      // Jedis stores Redis command errors in the responses and throws them from get().
+      pendingResponses.foreach(_.get())
+      pendingResponses.clear()
     }
   }
 }
