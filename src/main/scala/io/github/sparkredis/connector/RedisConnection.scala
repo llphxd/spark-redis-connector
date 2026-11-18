@@ -27,10 +27,7 @@ object RedisConnection {
     pools.clear()
   }
 
-  /**
-   * Open a dedicated, non-pooled connection. Closing it closes the underlying socket, which lets a
-   * writer discard any pipeline commands buffered but not yet sent (see RedisDataWriter.abort).
-   */
+  /** Open a dedicated, non-pooled connection for a writer's pipeline. */
   def openStandalone(options: RedisOptions): Jedis = {
     new Jedis(new HostAndPort(options.host, options.port), buildClientConfig(options))
   }
