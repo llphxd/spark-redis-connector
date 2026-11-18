@@ -1,9 +1,10 @@
 package io.github.sparkredis.connector
 
+import redis.clients.jedis.Jedis
 import redis.clients.jedis.params.ScanParams
-import redis.clients.jedis.resps.ScanResult
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable.LinkedHashSet
 
 object RedisKeyScanner {
   def loadKeys(options: RedisOptions): Seq[String] = {
@@ -30,19 +31,21 @@ object RedisKeyScanner {
     }
     val jedis = RedisConnection.open(options)
     try {
-      val params = new ScanParams()
-        .`match`(pattern)
-        .count(math.max(1, options.scanCount))
-      val keys = Vector.newBuilder[String]
-      var cursor = ScanParams.SCAN_POINTER_START
-      do {
-        val result: ScanResult[String] = jedis.scan(cursor, params)
-        keys ++= result.getResult.asScala
-        cursor = result.getCursor
-      } while (cursor != ScanParams.SCAN_POINTER_START)
-      keys.result()
+      scanKeys(jedis, pattern, options.scanCount)
     } finally {
       jedis.close()
     }
+  }
+
+  private[connector] def scanKeys(jedis: Jedis, pattern: String, scanCount: Int): Seq[String] = {
+    val params = new ScanParams().`match`(pattern).count(math.max(1, scanCount))
+    val keys = LinkedHashSet.empty[String]
+    var cursor = ScanParams.SCAN_POINTER_START
+    do {
+      val result = jedis.scan(cursor, params)
+      keys ++= result.getResult.asScala
+      cursor = result.getCursor
+    } while (cursor != ScanParams.SCAN_POINTER_START)
+    keys.toVector
   }
 }
