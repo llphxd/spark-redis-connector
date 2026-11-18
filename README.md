@@ -221,6 +221,8 @@ spark-shell \
 
 This repository starts with a small standalone Redis implementation. Batch reads use Redis `SCAN` for pattern-based key discovery and split discovered keys into Spark input partitions with `keys.per.partition`. The scan path supports Spark column pruning, and explicit-schema hash reads use `HMGET` for the selected fields.
 
+For string and wide-hash reads, projecting only the key or no columns uses Redis `TYPE` to skip missing keys and keys of other types. Wide-hash reads also use `TYPE` when every selected field is absent. Include `TYPE` when granting command-specific ACL permissions for these reads.
+
 Connections are backed by executor-side Jedis pools. Writes are buffered through Redis pipelines and are synced when `write.pipeline.size` Redis commands are queued. Spark still splits work by input partitions/tasks; this option controls Redis command flushing inside each writer task.
 
 The next important engineering steps are:

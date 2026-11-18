@@ -224,6 +224,8 @@ spark-shell \
 
 当前实现从 standalone Redis 开始。批读使用 Redis `SCAN` 做基于 pattern 的 key 发现，并通过 `keys.per.partition` 把发现的 key 拆分到 Spark input partitions。读路径支持 Spark column pruning；显式 schema 的 hash 读取会对选中的字段使用 `HMGET`。
 
+读取 string 和宽表 hash 时，如果只选 key 或没有选中任何列，连接器会使用 Redis `TYPE` 跳过缺失或类型不匹配的 key。宽表 hash 在选中的字段都不存在时也会使用 `TYPE`。如果按命令配置 Redis ACL，请为这些查询授予 `TYPE` 权限。
+
 连接由 executor 端 Jedis pool 管理。写入使用 Redis pipeline 缓冲，并在累计 `write.pipeline.size` 条 Redis 命令后 sync。Spark 仍按 input partitions/tasks 拆分工作，该参数只控制每个 writer task 内部的 Redis 命令 flush。
 
 后续重要工程方向：
