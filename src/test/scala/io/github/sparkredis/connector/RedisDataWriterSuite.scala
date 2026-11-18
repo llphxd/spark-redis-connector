@@ -29,6 +29,18 @@ class RedisDataWriterSuite extends AnyFunSuite {
     }
   }
 
+  test("abort discards the remainder of a pipeline after a successful flush") {
+    val socket = new RedisTestSocket("+OK\r\n+OK\r\n")
+    withWriter(pipelineSize = 2, socket) { writer =>
+      writer.write(stringRow("first-key"))
+      writer.write(stringRow("second-key"))
+      writer.write(stringRow("aborted-key"))
+      assert(socket.sent.contains("first-key"))
+      assert(socket.sent.contains("second-key"))
+    }
+    assert(!socket.sent.contains("aborted-key"))
+  }
+
   private val stringOptions = RedisOptions.from(
     new CaseInsensitiveStringMap(util.Collections.singletonMap("type", "string")))
   private val stringSchema = RedisSchemas.defaultSchema(stringOptions)
@@ -50,6 +62,8 @@ private class RedisTestSocket(replies: String) extends Socket {
   private val input = new ByteArrayInputStream(replies.getBytes(UTF_8))
   private val output = new ByteArrayOutputStream()
   private var closed = false
+
+  def sent: String = new String(output.toByteArray, UTF_8)
 
   override def isBound: Boolean = true
   override def isConnected: Boolean = true
