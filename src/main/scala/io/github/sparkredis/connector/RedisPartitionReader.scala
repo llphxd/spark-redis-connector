@@ -3,14 +3,20 @@ package io.github.sparkredis.connector
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.connector.read.PartitionReader
 import org.apache.spark.sql.types.StructType
+import redis.clients.jedis.Jedis
 import redis.clients.jedis.exceptions.JedisDataException
 
 import scala.collection.JavaConverters._
 
-class RedisPartitionReader(schema: StructType, options: RedisOptions, hashFieldMode: Boolean, keys: Seq[String])
+class RedisPartitionReader private[connector] (
+    schema: StructType, options: RedisOptions, hashFieldMode: Boolean, keys: Seq[String], jedis: Jedis)
     extends PartitionReader[InternalRow] {
 
-  private val jedis = RedisConnection.open(options)
+  def this(schema: StructType, options: RedisOptions, hashFieldMode: Boolean, keys: Seq[String]) =
+    this(schema, options, hashFieldMode, keys, RedisConnection.open(options))
+
+  private val projectedHashFields = schema.fieldNames.filterNot(_ == options.keyColumn)
+  private val readsStringValue = schema.fieldNames.contains(options.valueColumn)
   private val rows = keys.iterator.flatMap(readKey)
   private var current: InternalRow = _
 
@@ -32,12 +38,7 @@ class RedisPartitionReader(schema: StructType, options: RedisOptions, hashFieldM
     try {
       options.dataType match {
         case RedisDataType.StringValue =>
-          val values = Map.newBuilder[String, Any]
-          values += options.keyColumn -> logicalKey
-          if (schema.fieldNames.contains(options.valueColumn)) {
-            values += options.valueColumn -> jedis.get(key)
-          }
-          Iterator(row(values.result()))
+          readStringRow(key, logicalKey)
 
         case RedisDataType.Hash if hashFieldMode =>
           jedis.hgetAll(key).asScala.iterator.map { case (field, value) =>
@@ -45,7 +46,7 @@ class RedisPartitionReader(schema: StructType, options: RedisOptions, hashFieldM
           }
 
         case RedisDataType.Hash =>
-          Iterator(readHashRow(key, logicalKey))
+          readHashRow(key, logicalKey)
 
         case RedisDataType.SetValue =>
           jedis.smembers(key).asScala.iterator.map { value =>
@@ -69,14 +70,33 @@ class RedisPartitionReader(schema: StructType, options: RedisOptions, hashFieldM
     }
   }
 
-  private def readHashRow(key: String, logicalKey: String): InternalRow = {
-    val fields = schema.fields.map(_.name).filterNot(_ == options.keyColumn)
-    if (fields.isEmpty) {
-      row(Map(options.keyColumn -> logicalKey))
+  private def readStringRow(key: String, logicalKey: String): Iterator[InternalRow] = {
+    if (readsStringValue) {
+      Option(jedis.get(key)).iterator.map { value =>
+        row(Map(options.keyColumn -> logicalKey, options.valueColumn -> value))
+      }
     } else {
-      val values = jedis.hmget(key, fields: _*).asScala
-      row((fields.zip(values) :+ (options.keyColumn -> logicalKey)).toMap)
+      readKeyOnlyRow(key, logicalKey)
     }
+  }
+
+  private def readHashRow(key: String, logicalKey: String): Iterator[InternalRow] = {
+    if (projectedHashFields.isEmpty) {
+      readKeyOnlyRow(key, logicalKey)
+    } else {
+      val values = jedis.hmget(key, projectedHashFields: _*).asScala
+      // HMGET returns all nulls both for a missing key and for a hash lacking the requested fields.
+      if (values.exists(_ != null) || jedis.`type`(key) == options.dataType.name) {
+        Iterator(row((projectedHashFields.zip(values) :+ (options.keyColumn -> logicalKey)).toMap))
+      } else {
+        Iterator.empty
+      }
+    }
+  }
+
+  private def readKeyOnlyRow(key: String, logicalKey: String): Iterator[InternalRow] = {
+    if (jedis.`type`(key) == options.dataType.name) Iterator(row(Map(options.keyColumn -> logicalKey)))
+    else Iterator.empty
   }
 
   private def readList(key: String, logicalKey: String): Iterator[InternalRow] = {
@@ -86,8 +106,9 @@ class RedisPartitionReader(schema: StructType, options: RedisOptions, hashFieldM
         values.iterator.zipWithIndex.map { case (value, index) =>
           row(Map(options.keyColumn -> logicalKey, "index" -> index.toLong, options.valueColumn -> value))
         }
-      case RedisListReadMode.Array =>
+      case RedisListReadMode.Array if values.nonEmpty =>
         Iterator(row(Map(options.keyColumn -> logicalKey, "values" -> values.toSeq)))
+      case RedisListReadMode.Array => Iterator.empty
     }
   }
 
