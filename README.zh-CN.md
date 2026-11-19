@@ -33,6 +33,8 @@ Spark `3.2.x` 及以下、Spark `4.x` 及以上未在当前 release 中声明支
 
 ## 快速开始
 
+本文档对应 `main` 分支，可能包含尚未发布的改动。使用发布版 JAR 时，请查看对应 [Git 标签](https://github.com/llphxd/spark-redis-connector/tags) 下的 README。
+
 从 [GitHub Releases](https://github.com/llphxd/spark-redis-connector/releases) 下载 release jar。每个 release 提供两个文件：
 
 - `spark-redis-connector_2.12-<version>-all.jar` — 包含 shaded 运行时依赖（**推荐**用于 Spark `--jars`）
