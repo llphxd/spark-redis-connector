@@ -33,6 +33,8 @@ Spark `3.2.x` and earlier, and Spark `4.x` and later, are not declared as suppor
 
 ## Quick Start
 
+This README describes the `main` branch, which can include unreleased changes. For a release JAR, read the README at its matching [Git tag](https://github.com/llphxd/spark-redis-connector/tags).
+
 Download a release jar from [GitHub Releases](https://github.com/llphxd/spark-redis-connector/releases). Each release provides two artifacts:
 
 - `spark-redis-connector_2.12-<version>-all.jar` — connector plus shaded runtime dependencies (**recommended** for Spark `--jars`)
