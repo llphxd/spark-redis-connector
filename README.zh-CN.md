@@ -174,9 +174,9 @@ users.write
 | `password` | 读、写 | 否 | Redis password | 未设置 |
 | `database` | 读、写 | 否 | Redis logical database | `0` |
 | `timeout` | 读、写 | 否 | Redis connection 和 socket timeout，单位毫秒 | `2000` |
-| `connection.pool.max.total` | 读、写 | 否 | 每个 executor 连接池的最大连接数 | `8` |
-| `connection.pool.max.idle` | 读、写 | 否 | 每个 executor 连接池的最大空闲连接数 | `8` |
-| `connection.pool.min.idle` | 读、写 | 否 | 每个 executor 连接池的最小空闲连接数 | `0` |
+| `connection.pool.max.total` | 读、Overwrite 删除 | 否 | 每个连接池的最大连接数 | `8` |
+| `connection.pool.max.idle` | 读、Overwrite 删除 | 否 | 每个连接池的最大空闲连接数 | `8` |
+| `connection.pool.min.idle` | 读、Overwrite 删除 | 否 | 每个连接池的最小空闲连接数 | `0` |
 | `ssl.enabled` | 读、写 | 否 | 是否启用 SSL/TLS | `false` |
 | `ssl.truststore.path` | 读、写 | 否 | SSL/TLS truststore 路径 | 未设置 |
 | `ssl.truststore.password` | 读、写 | 否 | SSL/TLS truststore password | 未设置 |
@@ -230,7 +230,9 @@ spark-shell \
 
 读取 string 和宽表 hash 时，如果只选 key 或没有选中任何列，连接器会使用 Redis `TYPE` 跳过缺失或类型不匹配的 key。宽表 hash 在选中的字段都不存在时也会使用 `TYPE`。如果按命令配置 Redis ACL，请为这些查询授予 `TYPE` 权限。
 
-连接由 executor 端 Jedis pool 管理。写入使用 Redis pipeline 缓冲，并在累计 `write.pipeline.size` 条 Redis 命令后 sync。Spark 仍按 input partitions/tasks 拆分工作，该参数只控制每个 writer task 内部的 Redis 命令 flush。
+Driver 使用 Jedis 连接池执行模式扫描和 Overwrite 删除，读取任务使用 Executor 端的连接池。每个写入任务单独建立 Redis 连接，写入连接数取决于同时运行的写入任务数。
+
+写入使用 Redis pipeline 缓冲，并在累计 `write.pipeline.size` 条 Redis 命令后 sync。Spark 仍按 input partitions/tasks 拆分工作，该参数只控制每个 writer task 内部的 Redis 命令 flush。
 
 后续重要工程方向：
 
