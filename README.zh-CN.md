@@ -200,7 +200,7 @@ users.write
 
 `ttl` 为正数时，string 使用 `SETEX` 写入。hash、set、list 和 zset 在每个写入任务中为每个 key 排入一次 `EXPIRE`。
 
-读路径需要配置 `keys.pattern` 或 `keys`。Overwrite 写入需要配置 `keys.pattern` 或 `keys`，用于识别写入前要删除的 keyspace。
+读取和 Overwrite 写入需要配置 `keys` 或 `keys.pattern`。两者同时配置时，连接器使用显式的 `keys` 列表。
 
 ## 构建
 
@@ -230,7 +230,9 @@ spark-shell \
 
 ## 设计说明
 
-当前实现从 standalone Redis 开始。批读使用 Redis `SCAN` 做基于 pattern 的 key 发现，并通过 `keys.per.partition` 把发现的 key 拆分到 Spark input partitions。读路径支持 Spark column pruning；显式 schema 的 hash 读取会对选中的字段使用 `HMGET`。
+连接器支持 standalone Redis。使用 `keys.pattern` 时，Driver 通过 Redis `SCAN` 收集匹配的 key 并去重，再规划读取分区或执行 Overwrite 删除。`keys.per.partition` 限制每个读取分区或删除批次的 key 数量。Driver 发现 key 所需的内存仍会随匹配的不同 key 总数增长。
+
+读取支持 Spark 列裁剪。宽表 hash 读取使用 `HMGET` 获取选中的 hash 字段。
 
 读取 string 和宽表 hash 时，如果只选 key 或没有选中任何列，连接器会使用 Redis `TYPE` 跳过缺失或类型不匹配的 key。宽表 hash 在选中的字段都不存在时也会使用 `TYPE`。如果按命令配置 Redis ACL，请为这些查询授予 `TYPE` 权限。
 

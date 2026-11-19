@@ -197,7 +197,7 @@ Spark can infer a default schema for each Redis data type when you do not declar
 
 For a positive `ttl`, string writes use `SETEX`. Hash, set, list, and sorted set writes queue `EXPIRE` once per key per write task.
 
-For reads, either `keys.pattern` or `keys` is required. For overwrite writes, `keys.pattern` or `keys` is required to identify the keyspace to delete before writing new rows.
+Reads and overwrite writes require `keys` or `keys.pattern`. When both are supplied, the connector uses the explicit `keys` list.
 
 ## Build
 
@@ -227,7 +227,9 @@ spark-shell \
 
 ## Design Notes
 
-This repository starts with a small standalone Redis implementation. Batch reads use Redis `SCAN` for pattern-based key discovery and split discovered keys into Spark input partitions with `keys.per.partition`. The scan path supports Spark column pruning, and explicit-schema hash reads use `HMGET` for the selected fields.
+The connector supports standalone Redis. When using `keys.pattern`, the driver collects and deduplicates the matching keys from Redis `SCAN` before planning input partitions or deleting keys for overwrite. `keys.per.partition` bounds the number of keys in each input partition or deletion batch. Driver memory for key discovery still grows with the total number of distinct keys matched.
+
+The scan path supports Spark column pruning. Wide-hash reads use `HMGET` for the selected hash fields.
 
 For string and wide-hash reads, projecting only the key or no columns uses Redis `TYPE` to skip missing keys and keys of other types. Wide-hash reads also use `TYPE` when every selected field is absent. Include `TYPE` when granting command-specific ACL permissions for these reads.
 
