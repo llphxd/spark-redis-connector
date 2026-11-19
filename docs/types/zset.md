@@ -71,5 +71,5 @@ This section lists options most relevant to this Redis type. See the README Core
 | `key.prefix` | Prefix stripped from returned Spark keys during reads and prepended to Redis keys during writes. |
 | `member.column` | Column used as the sorted set member. Default: `member`. |
 | `score.column` | Column used as the sorted set score. Default: `score`. |
-| `ttl` | Expiration in seconds for written keys. Default: `0`, meaning no expiration. |
+| `ttl` | Positive values set a TTL in seconds. With `0` (default), writes keep any existing TTL. |
 

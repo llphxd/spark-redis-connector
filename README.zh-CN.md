@@ -196,7 +196,9 @@ users.write
 | `scan.count` | 读、Overwrite | 否 | Redis `SCAN COUNT` hint | `1000` |
 | `keys.per.partition` | 读、Overwrite | 否 | 每个 Spark 输入分区或删除批次的最大 key 数 | `1000` |
 | `write.pipeline.size` | 写 | 否 | 每处理一行后检查待发送命令数，达到该阈值时发送批次 | `1000` |
-| `ttl` | 写 | 否 | 写入 key 的过期时间，单位秒，`0` 表示不过期 | `0` |
+| `ttl` | 写 | 否 | 过期时间，单位秒。为 `0` 时，string 写入清除已有 TTL，集合类型写入保留已有 TTL | `0` |
+
+`ttl` 为正数时，string 使用 `SETEX` 写入。hash、set、list 和 zset 在每个写入任务中为每个 key 排入一次 `EXPIRE`。
 
 读路径需要配置 `keys.pattern` 或 `keys`。Overwrite 写入需要配置 `keys.pattern` 或 `keys`，用于识别写入前要删除的 keyspace。
 

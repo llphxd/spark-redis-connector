@@ -193,7 +193,9 @@ Spark can infer a default schema for each Redis data type when you do not declar
 | `scan.count` | Read, Overwrite | No | Redis `SCAN COUNT` hint used during key discovery. Example: `scan.count='5000'` | `1000` |
 | `keys.per.partition` | Read, Overwrite | No | Maximum discovered keys assigned to each Spark input partition or delete batch. Example: `keys.per.partition='2000'` | `1000` |
 | `write.pipeline.size` | Write | No | Queued Redis command count that triggers a flush after processing a row. Example `write.pipeline.size='1000'`. | `1000` |
-| `ttl` | Write | No | Expiration in seconds for written keys. `0` means no expiration. Example: `ttl='3600'` | `0` |
+| `ttl` | Write | No | Expiration in seconds. With `0`, string writes clear the existing TTL and collection writes keep it. | `0` |
+
+For a positive `ttl`, string writes use `SETEX`. Hash, set, list, and sorted set writes queue `EXPIRE` once per key per write task.
 
 For reads, either `keys.pattern` or `keys` is required. For overwrite writes, `keys.pattern` or `keys` is required to identify the keyspace to delete before writing new rows.
 
