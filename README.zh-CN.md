@@ -25,9 +25,11 @@ Redis Streams 会单独设计，因为批读取 Streams 和 Structured Streaming
 | --- | --- |
 | Spark | `3.3.x`, `3.4.x`, `3.5.x` |
 | Scala binary version | `2.12` |
-| Java | `8+` |
+| Java 字节码目标版本 | `8` |
 | Redis client | Jedis `5.1.5` |
 | Artifact | `spark-redis-connector_2.12` |
+
+请使用所选 Spark 发行版支持的 Java 版本。本项目的 CI 使用 Java 17。
 
 Spark `3.2.x` 及以下、Spark `4.x` 及以上未在当前 release 中声明支持。它们可能可以运行，但需要你基于自己的 Spark 和 Redis 运行环境自行验证。
 
