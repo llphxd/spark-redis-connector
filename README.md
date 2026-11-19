@@ -140,6 +140,8 @@ users.write
   .save()
 ```
 
+The connector reports Redis command errors to Spark. If a write task aborts, it discards the batch it has yet to start sending. Redis may already have applied commands from a failed batch, and Spark may retry the task.
+
 Overwrite is supported as truncate-style overwrite when `keys` or `keys.pattern` identifies the target keyspace.
 
 The connector checks that the input schema contains the required columns before deleting keys. Deletion uses the supplied key list or pattern directly, across Redis types and prefixes. If the write fails after deletion, the target can be empty or contain only part of the new data.
@@ -190,7 +192,7 @@ Spark can infer a default schema for each Redis data type when you do not declar
 | `list.write.command` | Write | No | List write command: `lpush` or `rpush`. Example: `list.write.command='lpush'` | `rpush` |
 | `scan.count` | Read, Overwrite | No | Redis `SCAN COUNT` hint used during key discovery. Example: `scan.count='5000'` | `1000` |
 | `keys.per.partition` | Read, Overwrite | No | Maximum discovered keys assigned to each Spark input partition or delete batch. Example: `keys.per.partition='2000'` | `1000` |
-| `write.pipeline.size` | Write | No | Maximum queued Redis commands before syncing the Redis pipeline. Example: `write.pipeline.size='1000'` | `1000` |
+| `write.pipeline.size` | Write | No | Queued Redis command count that triggers a flush after processing a row. Example `write.pipeline.size='1000'`. | `1000` |
 | `ttl` | Write | No | Expiration in seconds for written keys. `0` means no expiration. Example: `ttl='3600'` | `0` |
 
 For reads, either `keys.pattern` or `keys` is required. For overwrite writes, `keys.pattern` or `keys` is required to identify the keyspace to delete before writing new rows.
@@ -229,7 +231,7 @@ For string and wide-hash reads, projecting only the key or no columns uses Redis
 
 The driver uses a Jedis pool for pattern scans and overwrite deletion. Read tasks use executor-side pools. Each write task opens a dedicated Redis connection, so the number of concurrent write tasks determines how many writer connections can be open.
 
-Writes are buffered through Redis pipelines and are synced when `write.pipeline.size` Redis commands are queued. Spark still splits work by input partitions/tasks; this option controls Redis command flushing inside each writer task.
+Each write task buffers commands locally and sends them in a Redis pipeline when the command count reaches `write.pipeline.size` after processing a row. The task flushes any remaining commands on commit.
 
 The next important engineering steps are:
 

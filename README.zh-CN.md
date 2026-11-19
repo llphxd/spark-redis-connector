@@ -143,6 +143,8 @@ users.write
   .save()
 ```
 
+连接器会将 Redis 命令错误传给 Spark。写入任务中止时会丢弃尚未开始发送的批次。Redis 可能已经执行了失败批次中的部分命令，Spark 也可能重试该任务。
+
 当 `keys` 或 `keys.pattern` 标识目标 keyspace 时，支持 truncate 风格的 overwrite。
 
 连接器会在删除 key 前检查输入 schema 是否包含必需列。删除直接使用配置的 key 列表或 pattern，可以匹配不同 Redis 类型和前缀的 key。如果在删除后写入失败，目标可能为空或只包含部分新数据。
@@ -193,7 +195,7 @@ users.write
 | `list.write.command` | 写 | 否 | list 写入命令：`lpush` 或 `rpush` | `rpush` |
 | `scan.count` | 读、Overwrite | 否 | Redis `SCAN COUNT` hint | `1000` |
 | `keys.per.partition` | 读、Overwrite | 否 | 每个 Spark 输入分区或删除批次的最大 key 数 | `1000` |
-| `write.pipeline.size` | 写 | 否 | Redis pipeline 累积多少条命令后 sync | `1000` |
+| `write.pipeline.size` | 写 | 否 | 每处理一行后检查待发送命令数，达到该阈值时发送批次 | `1000` |
 | `ttl` | 写 | 否 | 写入 key 的过期时间，单位秒，`0` 表示不过期 | `0` |
 
 读路径需要配置 `keys.pattern` 或 `keys`。Overwrite 写入需要配置 `keys.pattern` 或 `keys`，用于识别写入前要删除的 keyspace。
@@ -232,7 +234,7 @@ spark-shell \
 
 Driver 使用 Jedis 连接池执行模式扫描和 Overwrite 删除，读取任务使用 Executor 端的连接池。每个写入任务单独建立 Redis 连接，写入连接数取决于同时运行的写入任务数。
 
-写入使用 Redis pipeline 缓冲，并在累计 `write.pipeline.size` 条 Redis 命令后 sync。Spark 仍按 input partitions/tasks 拆分工作，该参数只控制每个 writer task 内部的 Redis 命令 flush。
+每个写入任务先在本地缓冲命令，处理完一行后如果命令数达到 `write.pipeline.size`，就通过 Redis pipeline 发送批次。任务提交时会发送剩余命令。
 
 后续重要工程方向：
 

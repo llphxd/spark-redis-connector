@@ -85,6 +85,8 @@ items.select("key", "value")
   .save()
 ```
 
+If Spark retries a write task after Redis has already applied some of its `LPUSH` or `RPUSH` commands, the retry can add duplicate list elements.
+
 ## Type-Specific Options
 
 This section lists options most relevant to this Redis type. See the README Core Options section for the full option list.
