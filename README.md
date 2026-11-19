@@ -171,9 +171,9 @@ Spark can infer a default schema for each Redis data type when you do not declar
 | `password` | Read, Write | No | Redis password. Example: `password='secret'` | unset |
 | `database` | Read, Write | No | Redis logical database. Example: `database='1'` | `0` |
 | `timeout` | Read, Write | No | Redis connection and socket timeout in milliseconds. Example: `timeout='3000'` | `2000` |
-| `connection.pool.max.total` | Read, Write | No | Maximum Redis connections in each executor-side pool. Example: `connection.pool.max.total='16'` | `8` |
-| `connection.pool.max.idle` | Read, Write | No | Maximum idle Redis connections in each executor-side pool. Example: `connection.pool.max.idle='8'` | `8` |
-| `connection.pool.min.idle` | Read, Write | No | Minimum idle Redis connections in each executor-side pool. Example: `connection.pool.min.idle='1'` | `0` |
+| `connection.pool.max.total` | Read, Overwrite deletion | No | Maximum Redis connections in each pool. Example `connection.pool.max.total='16'`. | `8` |
+| `connection.pool.max.idle` | Read, Overwrite deletion | No | Maximum idle Redis connections in each pool. Example `connection.pool.max.idle='8'`. | `8` |
+| `connection.pool.min.idle` | Read, Overwrite deletion | No | Minimum idle Redis connections in each pool. Example `connection.pool.min.idle='1'`. | `0` |
 | `ssl.enabled` | Read, Write | No | Enable SSL/TLS. Example: `ssl.enabled='true'` | `false` |
 | `ssl.truststore.path` | Read, Write | No | Truststore path used for SSL/TLS. Example: `ssl.truststore.path='/path/to/redis.jks'` | unset |
 | `ssl.truststore.password` | Read, Write | No | Truststore password used for SSL/TLS. Example: `ssl.truststore.password='changeit'` | unset |
@@ -227,7 +227,9 @@ This repository starts with a small standalone Redis implementation. Batch reads
 
 For string and wide-hash reads, projecting only the key or no columns uses Redis `TYPE` to skip missing keys and keys of other types. Wide-hash reads also use `TYPE` when every selected field is absent. Include `TYPE` when granting command-specific ACL permissions for these reads.
 
-Connections are backed by executor-side Jedis pools. Writes are buffered through Redis pipelines and are synced when `write.pipeline.size` Redis commands are queued. Spark still splits work by input partitions/tasks; this option controls Redis command flushing inside each writer task.
+The driver uses a Jedis pool for pattern scans and overwrite deletion. Read tasks use executor-side pools. Each write task opens a dedicated Redis connection, so the number of concurrent write tasks determines how many writer connections can be open.
+
+Writes are buffered through Redis pipelines and are synced when `write.pipeline.size` Redis commands are queued. Spark still splits work by input partitions/tasks; this option controls Redis command flushing inside each writer task.
 
 The next important engineering steps are:
 
